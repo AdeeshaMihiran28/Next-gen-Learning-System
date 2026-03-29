@@ -1,2 +1,11 @@
-# Backend runtime dependencies will be added here.
-
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+opencv-python
+numpy
+python-dotenv
+whisper
+google-generativeai
+google-genai
+reportlab
