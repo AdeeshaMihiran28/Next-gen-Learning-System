@@ -1,3 +1,2 @@
 -r requirements.txt
-# Backend development dependencies will be added here.
-
+pytest
