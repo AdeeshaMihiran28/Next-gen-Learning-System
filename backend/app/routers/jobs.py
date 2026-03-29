@@ -6,11 +6,12 @@ import shutil
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile, status
 
 from app.core.config import OUTPUT_DIR, UPLOAD_DIR
 from app.domain.jobs import Job, JobStore, append_job_log
 from app.schemas.models import JobStatusResponse, ProcessingOptions, RunResponse, UploadResponse
+from app.services.pipeline import run_job_pipeline
 from app.utils.artifacts import build_artifact_path, existing_artifact_url
 from app.utils.files import create_job_dir
 
@@ -19,7 +20,11 @@ router = APIRouter()
 
 
 @router.post("/api/upload", response_model=UploadResponse, status_code=status.HTTP_201_CREATED)
-async def upload_video(video: UploadFile = File(...)) -> UploadResponse:
+async def upload_video(
+    background_tasks: BackgroundTasks,
+    video: UploadFile = File(...),
+    auto_start: bool = Form(False),
+) -> UploadResponse:
     job_id = str(uuid4())
     upload_dir = create_job_dir(UPLOAD_DIR, job_id)
     create_job_dir(OUTPUT_DIR, job_id)
@@ -42,6 +47,10 @@ async def upload_video(video: UploadFile = File(...)) -> UploadResponse:
     )
     append_job_log(job, f"Uploaded file saved to {input_path.name}")
 
+    if auto_start:
+        append_job_log(job, "Auto-start enabled; job queued in background")
+        background_tasks.add_task(run_job_pipeline, job_id)
+
     return UploadResponse(job_id=job_id)
 
 
@@ -60,8 +69,6 @@ async def run_job(
     background_tasks: BackgroundTasks,
     options: ProcessingOptions | None = None,
 ) -> RunResponse:
-    _ = background_tasks
-
     job = JobStore.get(job_id)
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
@@ -76,6 +83,7 @@ async def run_job(
     )
     if updated_job is not None:
         append_job_log(updated_job, "Job queued for processing")
+        background_tasks.add_task(run_job_pipeline, job_id)
 
     return RunResponse(job_id=job.job_id, status="queued")
 
