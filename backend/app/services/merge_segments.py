@@ -22,6 +22,7 @@ def normalize_segments(
                 "end": end,
                 "duration": max(0.0, end - start),
                 "reasons": [reason],
+                "source_metadata": dict(segment.get("source_metadata", {})),
             }
         )
 
@@ -50,6 +51,7 @@ def apply_freeze_rules(
                 "end": end,
                 "duration": duration,
                 "reasons": list(segment.get("reasons", ["freeze"])),
+                "source_metadata": dict(segment.get("source_metadata", {})),
             }
         )
 
@@ -69,6 +71,7 @@ def merge_bad_segments(
                 "end": float(segment["end"]),
                 "duration": max(0.0, float(segment["end"]) - float(segment["start"])),
                 "reasons": list(segment.get("reasons", [])),
+                "source_metadata": dict(segment.get("source_metadata", {})),
             }
             for segment in segments
         ),
@@ -86,6 +89,10 @@ def merge_bad_segments(
             current["end"] = max(current["end"], segment["end"])
             current["duration"] = max(0.0, current["end"] - current["start"])
             current["reasons"] = sorted(set(current["reasons"] + segment["reasons"]))
+            current["source_metadata"] = _merge_source_metadata(
+                current.get("source_metadata", {}),
+                segment.get("source_metadata", {}),
+            )
             continue
 
         merged_segments.append(segment)
@@ -130,3 +137,21 @@ def build_good_segments(
         )
 
     return good_segments
+
+
+def _merge_source_metadata(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(left)
+    right_score = right.get("score")
+    left_score = merged.get("score")
+
+    if isinstance(left_score, (int, float)) or isinstance(right_score, (int, float)):
+        merged["score"] = max(
+            float(left_score) if isinstance(left_score, (int, float)) else 0.0,
+            float(right_score) if isinstance(right_score, (int, float)) else 0.0,
+        )
+
+    merged["evidence_count"] = int(merged.get("evidence_count", 0) or 0) + int(
+        right.get("evidence_count", 0) or 0
+    )
+
+    return merged
