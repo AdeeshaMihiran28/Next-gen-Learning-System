@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -27,7 +25,12 @@ def test_upload_endpoint_creates_job_and_saves_file(workspace_tmp_path):
     response = client.post(
         "/api/upload",
         files={"video": ("lecture.mp4", b"video-bytes", "video/mp4")},
-        data={"auto_start": "false"},
+        data={
+            "auto_start": "false",
+            "whisper_model": "tiny",
+            "freeze_enabled": "false",
+            "buffering_template_ids": "template-a",
+        },
     )
 
     assert response.status_code == 201
@@ -40,6 +43,9 @@ def test_upload_endpoint_creates_job_and_saves_file(workspace_tmp_path):
     assert job.status == "queued"
     assert job.input_path == workspace_tmp_path / "uploads" / job_id / "input.mp4"
     assert job.input_path.read_bytes() == b"video-bytes"
+    assert job.options.whisper_model == "tiny"
+    assert job.options.freeze_enabled is False
+    assert job.options.buffering_template_ids == ["template-a"]
     assert (workspace_tmp_path / "outputs" / job_id).is_dir()
 
 
@@ -61,7 +67,7 @@ def test_job_status_endpoint_returns_output_url_only_when_done(workspace_tmp_pat
     payload = response.json()
     assert payload["job_id"] == "job-status"
     assert payload["status"] == "done"
-    assert payload["output_url"] == f"/artifacts/{job.job_id}/cleaned.mp4"
+    assert payload["output_url"] == f"/api/jobs/{job.job_id}/download"
     assert payload["logs"] == []
 
 

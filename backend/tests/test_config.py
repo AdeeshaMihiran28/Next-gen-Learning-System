@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
 
 
 def test_config_loads_env_and_creates_directories(monkeypatch, workspace_tmp_path):
@@ -28,3 +29,21 @@ def test_config_loads_env_and_creates_directories(monkeypatch, workspace_tmp_pat
     assert config.UPLOAD_DIR.is_dir()
     assert config.OUTPUT_DIR.is_dir()
     assert config.TEMPLATE_DIR.is_dir()
+
+
+def test_config_resolves_relative_env_paths_from_backend_base(monkeypatch, workspace_tmp_path):
+    relative_upload_dir = Path("relative") / "uploads"
+    relative_output_dir = Path("relative") / "outputs"
+    relative_template_dir = Path("relative") / "templates"
+
+    monkeypatch.setenv("UPLOAD_DIR", str(relative_upload_dir))
+    monkeypatch.setenv("OUTPUT_DIR", str(relative_output_dir))
+    monkeypatch.setenv("TEMPLATE_DIR", str(relative_template_dir))
+
+    import app.core.config as config
+
+    config = importlib.reload(config)
+
+    assert config.UPLOAD_DIR == (config.BASE_DIR / relative_upload_dir).resolve()
+    assert config.OUTPUT_DIR == (config.BASE_DIR / relative_output_dir).resolve()
+    assert config.TEMPLATE_DIR == (config.BASE_DIR / relative_template_dir).resolve()
