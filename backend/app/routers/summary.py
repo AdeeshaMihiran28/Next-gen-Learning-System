@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse, JSONResponse
 
-from app.core.config import OUTPUT_DIR
 from app.domain.jobs import Job, JobStore
+from app.utils.artifacts import existing_summary_path, load_json_file
 
 
 router = APIRouter()
@@ -38,8 +35,7 @@ async def get_summary_pdf(job_id: str) -> FileResponse:
 async def get_summary_json(job_id: str) -> JSONResponse:
     _get_job_or_404(job_id)
     summary_path = _get_summary_path_or_404(job_id, "summary.json")
-    with summary_path.open("r", encoding="utf-8") as handle:
-        return JSONResponse(content=json.load(handle))
+    return JSONResponse(content=load_json_file(summary_path))
 
 
 def _get_job_or_404(job_id: str) -> Job:
@@ -49,8 +45,8 @@ def _get_job_or_404(job_id: str) -> Job:
     return job
 
 
-def _get_summary_path_or_404(job_id: str, filename: str) -> Path:
-    summary_path = OUTPUT_DIR / job_id / filename
-    if not summary_path.is_file():
+def _get_summary_path_or_404(job_id: str, filename: str):
+    summary_path = existing_summary_path(job_id, filename)
+    if summary_path is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Summary artifact not found")
     return summary_path

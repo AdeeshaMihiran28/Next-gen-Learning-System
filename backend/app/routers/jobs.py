@@ -2,18 +2,13 @@
 
 from __future__ import annotations
 
-import shutil
-from pathlib import Path
-from uuid import uuid4
-
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile, status
 
-from app.core.config import OUTPUT_DIR, UPLOAD_DIR
 from app.domain.jobs import Job, JobStore, append_job_log
 from app.schemas.models import JobStatusResponse, ProcessingOptions, RunResponse, UploadResponse
+from app.services.job_lifecycle import create_job_from_upload, queue_job_for_processing
 from app.services.pipeline import run_job_pipeline
-from app.utils.artifacts import build_artifact_path, existing_artifact_url
-from app.utils.files import create_job_dir
+from app.utils.artifacts import existing_artifact_url
 
 
 router = APIRouter()
@@ -25,33 +20,19 @@ async def upload_video(
     video: UploadFile = File(...),
     auto_start: bool = Form(False),
 ) -> UploadResponse:
-    job_id = str(uuid4())
-    upload_dir = create_job_dir(UPLOAD_DIR, job_id)
-    create_job_dir(OUTPUT_DIR, job_id)
-
-    original_extension = Path(video.filename or "input").suffix
-    input_path = upload_dir / f"input{original_extension}"
-
     try:
-        with input_path.open("wb") as handle:
-            shutil.copyfileobj(video.file, handle)
+        job = create_job_from_upload(
+            filename=video.filename,
+            file_stream=video.file,
+        )
     finally:
         await video.close()
 
-    job = JobStore.create(
-        job_id,
-        status="queued",
-        input_path=input_path,
-        output_path=build_artifact_path(job_id, "cleaned"),
-        report_path=build_artifact_path(job_id, "report"),
-    )
-    append_job_log(job, f"Uploaded file saved to {input_path.name}")
-
     if auto_start:
         append_job_log(job, "Auto-start enabled; job queued in background")
-        background_tasks.add_task(run_job_pipeline, job_id)
+        background_tasks.add_task(run_job_pipeline, job.job_id)
 
-    return UploadResponse(job_id=job_id)
+    return UploadResponse(job_id=job.job_id)
 
 
 @router.get("/api/jobs/{job_id}", response_model=JobStatusResponse)
@@ -76,13 +57,8 @@ async def run_job(
     if job.status == "running":
         return RunResponse(job_id=job.job_id, status="running")
 
-    updated_job = JobStore.update(
-        job_id,
-        status="queued",
-        options=options or job.options,
-    )
+    updated_job = queue_job_for_processing(job_id, options=options)
     if updated_job is not None:
-        append_job_log(updated_job, "Job queued for processing")
         background_tasks.add_task(run_job_pipeline, job_id)
 
     return RunResponse(job_id=job.job_id, status="queued")
