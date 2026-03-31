@@ -1,29 +1,37 @@
 """Pydantic response models for the backend API."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UploadResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     job_id: str
 
 
 class RunResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     job_id: str
     status: str
 
 
 class JobStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     job_id: str
     status: str
     progress: int
     created_at: str
     updated_at: str
     logs: list[str]
-    output_url: str | None
-    error_message: str | None
+    output_url: str | None = None
+    error_message: str | None = None
 
 
 class ProcessingOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     black_d: float = 0.2
     black_pix_th: float = 0.98
     silence_noise_db: int = -35
