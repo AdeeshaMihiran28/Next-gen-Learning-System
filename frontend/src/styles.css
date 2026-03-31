@@ -79,6 +79,14 @@ select {
   font-size: 1.1rem;
 }
 
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
 .subform,
 .field {
   display: grid;
@@ -306,6 +314,11 @@ select {
 
   .summary-header {
     align-items: stretch;
+    flex-direction: column;
+  }
+
+  .section-header {
+    align-items: flex-start;
     flex-direction: column;
   }
 
