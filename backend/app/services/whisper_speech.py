@@ -3,41 +3,33 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 from typing import Any
 
-from app.services.ffmpeg import FFmpegNotFound
+from app.services.ffmpeg import run_ffmpeg_command
 
 
 def extract_audio_to_wav(video_path: Path, wav_path: Path) -> Path:
     """Extract mono 16 kHz WAV audio from a video using ffmpeg."""
     wav_path.parent.mkdir(parents=True, exist_ok=True)
+    if not video_path.is_file():
+        raise FileNotFoundError(f"Input video was not found: {video_path}")
 
-    try:
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(video_path),
-                "-vn",
-                "-acodec",
-                "pcm_s16le",
-                "-ar",
-                "16000",
-                "-ac",
-                "1",
-                str(wav_path),
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except FileNotFoundError as exc:
-        raise FFmpegNotFound(
-            "ffmpeg was not found. Install FFmpeg and ensure ffmpeg is available on PATH."
-        ) from exc
+    run_ffmpeg_command(
+        [
+            "-y",
+            "-i",
+            str(video_path),
+            "-vn",
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            str(wav_path),
+        ],
+    )
 
     return wav_path
 

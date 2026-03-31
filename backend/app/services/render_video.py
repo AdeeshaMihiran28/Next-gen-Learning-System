@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import subprocess
 from shutil import rmtree
 from pathlib import Path
 from typing import Any
 
-from app.services.ffmpeg import FFmpegNotFound
+from app.services.ffmpeg import run_ffmpeg_command
 
 
 def render_cleaned_video(
@@ -42,6 +41,8 @@ def _render_segments(
 ) -> Path:
     if not segments:
         raise ValueError("At least one segment is required for rendering")
+    if not input_path.is_file():
+        raise FileNotFoundError(f"Input video was not found: {input_path}")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temp_dir = output_path.parent / f".{stem}_parts"
@@ -88,54 +89,36 @@ def _render_segment_clip(
     duration: float,
     output_path: Path,
 ) -> None:
-    try:
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-ss",
-                str(start),
-                "-i",
-                str(input_path),
-                "-t",
-                str(duration),
-                "-c:v",
-                "libx264",
-                "-c:a",
-                "aac",
-                str(output_path),
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except FileNotFoundError as exc:
-        raise FFmpegNotFound(
-            "ffmpeg was not found. Install FFmpeg and ensure ffmpeg is available on PATH."
-        ) from exc
+    run_ffmpeg_command(
+        [
+            "-y",
+            "-ss",
+            str(start),
+            "-i",
+            str(input_path),
+            "-t",
+            str(duration),
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "aac",
+            str(output_path),
+        ],
+    )
 
 
 def _concat_segment_clips(concat_file: Path, output_path: Path) -> None:
-    try:
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-f",
-                "concat",
-                "-safe",
-                "0",
-                "-i",
-                str(concat_file),
-                "-c",
-                "copy",
-                str(output_path),
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except FileNotFoundError as exc:
-        raise FFmpegNotFound(
-            "ffmpeg was not found. Install FFmpeg and ensure ffmpeg is available on PATH."
-        ) from exc
+    run_ffmpeg_command(
+        [
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(concat_file),
+            "-c",
+            "copy",
+            str(output_path),
+        ],
+    )

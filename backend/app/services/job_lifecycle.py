@@ -20,6 +20,7 @@ def create_job_from_upload(
     options: ProcessingOptions | None = None,
 ) -> Job:
     """Persist an uploaded video and create its initial queued job record."""
+    normalized_options = options or ProcessingOptions()
     job_id = str(uuid4())
     upload_dir = create_job_dir(UPLOAD_DIR, job_id)
     create_job_dir(OUTPUT_DIR, job_id)
@@ -34,7 +35,7 @@ def create_job_from_upload(
         input_path=input_path,
         output_path=build_artifact_path(job_id, "cleaned"),
         report_path=build_artifact_path(job_id, "report"),
-        options=options,
+        options=normalized_options,
     )
     append_job_log(job, f"Uploaded file saved to {input_path.name}")
     return job

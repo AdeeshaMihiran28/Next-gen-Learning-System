@@ -30,7 +30,7 @@ from app.services.whisper_speech import (
     transcribe_wav_with_whisper,
 )
 from app.utils.artifacts import build_artifact_path
-from app.utils.files import create_job_dir, write_segments_csv
+from app.utils.files import cleanup_paths, create_job_dir, write_segments_csv
 
 
 def run_job_pipeline(job_id: str) -> Job:
@@ -60,7 +60,7 @@ def run_job_pipeline(job_id: str) -> Job:
     cleaned_video_path = build_artifact_path(job_id, "cleaned")
     report_path = build_artifact_path(job_id, "report")
 
-    artifacts: dict[str, Any] = {
+    artifacts: dict[str, str | None] = {
         "black_log": str(black_json_path.name),
         "silence_log": str(silence_json_path.name),
         "freeze_json": str(freeze_json_path.name),
@@ -90,6 +90,7 @@ def run_job_pipeline(job_id: str) -> Job:
             pixel_threshold=options.black_pix_th,
         )
         _write_json(black_json_path, black_segments)
+        append_job_log(job, f"Black detection found {len(black_segments)} segment(s)")
 
         _update_job(job, progress=18)
         buffering_segments: list[dict[str, Any]] = []
@@ -104,6 +105,10 @@ def run_job_pipeline(job_id: str) -> Job:
                 match_threshold=options.buffering_match_thresh,
                 min_duration=options.buffering_min_d,
             )
+            append_job_log(
+                job,
+                f"Buffering detection used {len(templates)} template(s) and found {len(buffering_segments)} segment(s)",
+            )
         else:
             append_job_log(job, "Buffering detection disabled")
         _write_json(buffering_json_path, buffering_segments)
@@ -117,6 +122,7 @@ def run_job_pipeline(job_id: str) -> Job:
             min_duration=options.silence_d,
         )
         _write_json(silence_json_path, silence_segments)
+        append_job_log(job, f"Silence detection found {len(silence_segments)} segment(s)")
 
         _update_job(job, progress=36)
         freeze_segments: list[dict[str, Any]] = []
@@ -128,6 +134,7 @@ def run_job_pipeline(job_id: str) -> Job:
                 diff_threshold=options.freeze_diff_threshold,
                 min_freeze_duration=options.freeze_min_duration,
             )
+            append_job_log(job, f"Freeze detection found {len(freeze_segments)} segment(s)")
         else:
             append_job_log(job, "Freeze detection disabled")
         _write_json(freeze_json_path, freeze_segments)
@@ -141,6 +148,7 @@ def run_job_pipeline(job_id: str) -> Job:
             model_name=options.whisper_model,
             language=options.whisper_language,
         )
+        append_job_log(job, f"Whisper produced {len(raw_speech_segments)} speech segment(s)")
 
         _update_job(job, progress=58)
         append_job_log(job, "Building speech segments and no-speech gaps")
@@ -152,6 +160,10 @@ def run_job_pipeline(job_id: str) -> Job:
             speech_segments,
             total_duration,
             min_gap_duration=options.no_speech_min_d,
+        )
+        append_job_log(
+            job,
+            f"Built {len(speech_segments)} merged speech segment(s) and {len(no_speech_segments)} no-speech gap(s)",
         )
 
         _update_job(job, progress=64)
@@ -166,6 +178,7 @@ def run_job_pipeline(job_id: str) -> Job:
             _attach_reason_and_metadata(gated_freeze_segments, "freeze"),
             min_duration=options.freeze_min_duration,
         )
+        append_job_log(job, f"Freeze gating kept {len(gated_freeze_segments)} removable freeze segment(s)")
 
         _update_job(job, progress=72)
         append_job_log(job, "Normalizing and merging bad segments")
@@ -177,6 +190,10 @@ def run_job_pipeline(job_id: str) -> Job:
 
         normalized_bad_segments = _normalize_bad_segments(all_bad_segments)
         merged_bad_segments = merge_bad_segments(normalized_bad_segments)
+        append_job_log(
+            job,
+            f"Merged {len(normalized_bad_segments)} raw bad segment(s) into {len(merged_bad_segments)} segment(s)",
+        )
 
         _update_job(job, progress=78)
         append_job_log(job, "Applying speech-safe trimming")
@@ -187,16 +204,22 @@ def run_job_pipeline(job_id: str) -> Job:
             overlap_threshold=overlap_threshold,
             min_kept_segment_duration=0.1,
         )
+        append_job_log(
+            job,
+            f"Speech-safe trimming kept {len(safe_removal_segments)} removal segment(s) with {len(overlap_violations)} overlap violation(s)",
+        )
 
         _update_job(job, progress=82)
         append_job_log(job, "Assigning confidence to removal segments")
         confident_removal_segments = add_confidence_to_segments(safe_removal_segments)
+        append_job_log(job, f"Assigned confidence to {len(confident_removal_segments)} removal segment(s)")
 
         _update_job(job, progress=86)
         append_job_log(job, "Building kept segments")
         good_segments = build_good_segments(confident_removal_segments, total_duration)
         if not good_segments:
             raise RuntimeError("No kept segments remain after filtering")
+        append_job_log(job, f"Built {len(good_segments)} kept segment(s)")
 
         append_job_log(job, "Writing segments.csv")
         written_segments_csv = write_segments_csv(output_dir, confident_removal_segments)
@@ -234,27 +257,27 @@ def run_job_pipeline(job_id: str) -> Job:
         output_is_valid = validate_rendered_video(cleaned_video_path, validation_log_path)
 
         append_job_log(job, "Writing report.json")
-        report = {
-            "job_id": job.job_id,
-            "status": "done" if output_is_valid else "failed_validation",
-            "duration_seconds": total_duration,
-            "transcript_text": transcript_text,
-            "speech_segments": speech_segments,
-            "no_speech_segments": no_speech_segments,
-            "detections": {
+        report = _build_report(
+            job,
+            status="done" if output_is_valid else "failed_validation",
+            duration_seconds=total_duration,
+            transcript_text=transcript_text,
+            speech_segments=speech_segments,
+            no_speech_segments=no_speech_segments,
+            detections={
                 "black": black_segments,
                 "buffering": buffering_segments,
                 "silence": silence_segments,
                 "freeze": freeze_segments,
                 "gated_freeze": gated_freeze_segments,
             },
-            "removed_segments": confident_removal_segments,
-            "kept_segments": good_segments,
-            "safety_statistics": safety_statistics,
-            "overlap_violations": overlap_violations,
-            "artifacts": artifacts,
-            "output_valid": output_is_valid,
-        }
+            removed_segments=confident_removal_segments,
+            kept_segments=good_segments,
+            safety_statistics=safety_statistics,
+            overlap_violations=overlap_violations,
+            artifacts=artifacts,
+            output_valid=output_is_valid,
+        )
         _write_json(report_path, report)
 
         final_status = "done" if output_is_valid else "failed"
@@ -272,17 +295,16 @@ def run_job_pipeline(job_id: str) -> Job:
     except Exception as exc:
         _update_job(job, status="failed", error_message=str(exc))
         append_job_log(job, f"Pipeline failed: {exc}")
-        error_report = {
-            "job_id": job.job_id,
-            "status": "failed",
-            "error": str(exc),
-            "logs": job.logs,
-        }
+        error_report = _build_report(
+            job,
+            status="failed",
+            error_message=str(exc),
+            artifacts=artifacts,
+        )
         _write_json(report_path, error_report)
         raise
     finally:
-        if audio_path.exists():
-            audio_path.unlink()
+        cleanup_paths([audio_path])
 
 
 def _update_job(job: Job, **changes: object) -> Job:
@@ -295,6 +317,42 @@ def _update_job(job: Job, **changes: object) -> Job:
 def _write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _build_report(
+    job: Job,
+    *,
+    status: str,
+    error_message: str | None = None,
+    duration_seconds: float | None = None,
+    transcript_text: str = "",
+    speech_segments: list[dict[str, Any]] | None = None,
+    no_speech_segments: list[dict[str, Any]] | None = None,
+    detections: dict[str, Any] | None = None,
+    removed_segments: list[dict[str, Any]] | None = None,
+    kept_segments: list[dict[str, Any]] | None = None,
+    safety_statistics: dict[str, Any] | None = None,
+    overlap_violations: list[dict[str, Any]] | None = None,
+    artifacts: dict[str, str | None] | None = None,
+    output_valid: bool | None = None,
+) -> dict[str, Any]:
+    return {
+        "job_id": job.job_id,
+        "status": status,
+        "error_message": error_message,
+        "duration_seconds": duration_seconds,
+        "transcript_text": transcript_text,
+        "speech_segments": speech_segments or [],
+        "no_speech_segments": no_speech_segments or [],
+        "detections": detections or {},
+        "removed_segments": removed_segments or [],
+        "kept_segments": kept_segments or [],
+        "safety_statistics": safety_statistics or {},
+        "overlap_violations": overlap_violations or [],
+        "artifacts": artifacts or {},
+        "output_valid": output_valid,
+        "logs": list(job.logs),
+    }
 
 
 def _resolve_template_paths(template_ids: list[str]) -> list[Path]:
