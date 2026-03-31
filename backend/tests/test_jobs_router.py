@@ -7,12 +7,13 @@ from fastapi.testclient import TestClient
 
 from app.domain.jobs import JobStore
 from app.routers import jobs as jobs_router
+from app.services import job_lifecycle
 from app.utils import artifacts as artifact_utils
 
 
 def _create_test_client(workspace_tmp_path) -> TestClient:
-    jobs_router.UPLOAD_DIR = workspace_tmp_path / "uploads"
-    jobs_router.OUTPUT_DIR = workspace_tmp_path / "outputs"
+    job_lifecycle.UPLOAD_DIR = workspace_tmp_path / "uploads"
+    job_lifecycle.OUTPUT_DIR = workspace_tmp_path / "outputs"
     artifact_utils.OUTPUT_DIR = workspace_tmp_path / "outputs"
 
     app = FastAPI()
