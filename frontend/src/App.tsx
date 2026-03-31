@@ -39,6 +39,69 @@ type StructuredSummary = {
   outline?: Array<string | Record<string, unknown>>;
 };
 
+type SummaryGenerationResponse = {
+  job_id: string;
+  status: string;
+  message?: string;
+};
+
+type ProcessingOptionsState = {
+  black_d: number;
+  black_pix_th: number;
+  silence_noise_db: number;
+  silence_d: number;
+  freeze_enabled: boolean;
+  freeze_sampling_fps: number;
+  freeze_diff_threshold: number;
+  freeze_min_duration: number;
+  generate_kept_preview: boolean;
+  enable_buffering_detect: boolean;
+  buffering_sample_fps: number;
+  buffering_match_thresh: number;
+  buffering_min_d: number;
+  whisper_model: string;
+  whisper_language: string;
+  no_speech_min_d: number;
+  freeze_min_no_speech_overlap: number;
+  freeze_force_remove_sec: number;
+  strict_no_cut_speech: boolean;
+  speech_overlap_threshold_sec: number;
+};
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+
+const DEFAULT_OPTIONS: ProcessingOptionsState = {
+  black_d: 0.2,
+  black_pix_th: 0.98,
+  silence_noise_db: -35,
+  silence_d: 0.5,
+  freeze_enabled: true,
+  freeze_sampling_fps: 2,
+  freeze_diff_threshold: 0.01,
+  freeze_min_duration: 1.0,
+  generate_kept_preview: false,
+  enable_buffering_detect: true,
+  buffering_sample_fps: 1,
+  buffering_match_thresh: 0.9,
+  buffering_min_d: 1.0,
+  whisper_model: "base",
+  whisper_language: "en",
+  no_speech_min_d: 0.75,
+  freeze_min_no_speech_overlap: 0.5,
+  freeze_force_remove_sec: 3.0,
+  strict_no_cut_speech: true,
+  speech_overlap_threshold_sec: 0.2,
+};
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<UploadPage />} />
+      <Route path="/jobs/:job_id" element={<JobDetailsPage />} />
+    </Routes>
+  );
+}
+
 function UploadPage() {
   const navigate = useNavigate();
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -46,55 +109,36 @@ function UploadPage() {
   const [templates, setTemplates] = useState<TemplateInfo[]>([]);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
   const [autoStart, setAutoStart] = useState(true);
+  const [options, setOptions] = useState<ProcessingOptionsState>(DEFAULT_OPTIONS);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
   const [isUploadingTemplates, setIsUploadingTemplates] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [templateMessage, setTemplateMessage] = useState("");
-  const [options, setOptions] = useState({
-    black_d: 0.2,
-    black_pix_th: 0.98,
-    silence_noise_db: -35,
-    silence_d: 0.5,
-    freeze_enabled: true,
-    freeze_sampling_fps: 2,
-    freeze_diff_threshold: 0.01,
-    freeze_min_duration: 1.0,
-    generate_kept_preview: false,
-    enable_buffering_detect: true,
-    buffering_sample_fps: 1,
-    buffering_match_thresh: 0.9,
-    buffering_min_d: 1.0,
-    whisper_model: "base",
-    whisper_language: "en",
-    no_speech_min_d: 0.75,
-    freeze_min_no_speech_overlap: 0.5,
-    freeze_force_remove_sec: 3.0,
-    strict_no_cut_speech: true,
-    speech_overlap_threshold_sec: 0.2,
-  });
 
   useEffect(() => {
     void fetchTemplates();
   }, []);
 
   async function fetchTemplates() {
+    setIsLoadingTemplates(true);
     try {
-      const response = await fetch("/api/templates");
-      if (!response.ok) {
-        throw new Error("Failed to load templates.");
-      }
-
-      const payload: { templates: TemplateInfo[] } = await response.json();
+      const payload = await requestJson<{ templates: TemplateInfo[] }>("/api/templates", {
+        errorMessage: "Failed to load templates.",
+      });
       setTemplates(payload.templates);
       setSelectedTemplateIds((current) =>
         current.filter((templateId) => payload.templates.some((template) => template.template_id === templateId)),
       );
+      setTemplateMessage("");
     } catch (error) {
       setTemplateMessage(error instanceof Error ? error.message : "Failed to load templates.");
+    } finally {
+      setIsLoadingTemplates(false);
     }
   }
 
-  function updateOption(name: keyof typeof options, value: string | boolean) {
+  function updateOption(name: keyof ProcessingOptionsState, value: string | boolean) {
     setOptions((current) => ({
       ...current,
       [name]:
@@ -129,16 +173,11 @@ function UploadPage() {
     }
 
     try {
-      const response = await fetch("/api/templates/upload", {
+      const payload = await requestJson<{ templates: TemplateInfo[] }>("/api/templates/upload", {
         method: "POST",
         body: formData,
+        errorMessage: "Template upload failed.",
       });
-
-      if (!response.ok) {
-        throw new Error("Template upload failed.");
-      }
-
-      const payload: { templates: TemplateInfo[] } = await response.json();
       setTemplateFiles([]);
       setTemplateMessage(`Uploaded ${payload.templates.length} template file(s).`);
       await fetchTemplates();
@@ -180,16 +219,11 @@ function UploadPage() {
     }
 
     try {
-      const response = await fetch("/api/upload", {
+      const payload = await requestJson<{ job_id: string }>("/api/upload", {
         method: "POST",
         body: formData,
+        errorMessage: "Upload failed.",
       });
-
-      if (!response.ok) {
-        throw new Error("Upload failed.");
-      }
-
-      const payload: { job_id: string } = await response.json();
       navigate(`/jobs/${payload.job_id}`);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Upload failed.");
@@ -204,14 +238,17 @@ function UploadPage() {
         <header className="page-header">
           <h1 className="page-title">Lecture Video Cleaner</h1>
           <p className="page-intro">
-            Upload a lecture video, manage buffering templates, and choose the processing options before starting a
-            job.
+            Upload a lecture video, manage buffering templates, and choose processing options before starting a job.
           </p>
         </header>
 
         <div className="stack">
           <section className="panel">
-            <h2 className="section-title">Buffering Templates</h2>
+            <div className="section-header">
+              <h2 className="section-title">Buffering Templates</h2>
+              {isLoadingTemplates ? <span className="helper-text">Loading templates...</span> : null}
+            </div>
+
             <form onSubmit={handleTemplateUpload} className="subform">
               <label className="field">
                 <span className="field-label">Template image files</span>
@@ -222,9 +259,18 @@ function UploadPage() {
                   multiple
                   onChange={(event) => setTemplateFiles(Array.from(event.target.files ?? []))}
                 />
+                <span className="helper-text">
+                  {templateFiles.length > 0
+                    ? `${templateFiles.length} file(s) selected`
+                    : "Accepted formats: PNG, JPG, JPEG"}
+                </span>
               </label>
 
-              <button type="submit" disabled={isUploadingTemplates} className="button button-secondary">
+              <button
+                type="submit"
+                disabled={isUploadingTemplates || templateFiles.length === 0}
+                className="button button-secondary"
+              >
                 {isUploadingTemplates ? "Uploading Templates..." : "Upload Templates"}
               </button>
             </form>
@@ -263,6 +309,9 @@ function UploadPage() {
                   accept="video/*"
                   onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)}
                 />
+                <span className="helper-text">
+                  {videoFile ? `Selected: ${videoFile.name}` : "Choose a single video file to upload."}
+                </span>
               </label>
 
               <label className="checkbox-row">
@@ -309,7 +358,7 @@ function UploadPage() {
 
             {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
 
-            <button type="submit" disabled={isSubmitting} className="button button-primary">
+            <button type="submit" disabled={isSubmitting || !videoFile} className="button button-primary">
               {isSubmitting ? "Uploading..." : "Upload Video"}
             </button>
           </form>
@@ -328,53 +377,7 @@ function JobDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [summaryErrorMessage, setSummaryErrorMessage] = useState("");
-
-  async function loadJobDetails(currentJobId: string) {
-    const [jobResponse, artifactResponse] = await Promise.all([
-      fetch(`/api/jobs/${currentJobId}`),
-      fetch(`/api/jobs/${currentJobId}/artifacts`),
-    ]);
-
-    if (!jobResponse.ok) {
-      throw new Error("Failed to load job details.");
-    }
-    if (!artifactResponse.ok) {
-      throw new Error("Failed to load job artifacts.");
-    }
-
-    const jobPayload: JobStatus = await jobResponse.json();
-    const artifactPayload: ArtifactAvailability = await artifactResponse.json();
-
-    return { jobPayload, artifactPayload };
-  }
-
-  async function loadSummary(currentJobId: string, options?: { silentNotFound?: boolean }) {
-    const summaryResponse = await fetch(`/api/jobs/${currentJobId}/summary.json`);
-
-    if (summaryResponse.status === 404) {
-      setSummary(null);
-      if (!options?.silentNotFound) {
-        setSummaryErrorMessage("Summary is not available yet.");
-      }
-      return;
-    }
-
-    if (!summaryResponse.ok) {
-      throw new Error("Failed to load summary preview.");
-    }
-
-    const summaryPayload: StructuredSummary = await summaryResponse.json();
-    setSummary(summaryPayload);
-    setSummaryErrorMessage("");
-  }
-
-  async function checkSummaryPdf(currentJobId: string) {
-    const response = await fetch(`/api/jobs/${currentJobId}/summary.pdf`, {
-      method: "HEAD",
-    });
-    setSummaryPdfAvailable(response.ok);
-  }
+  const [summaryMessage, setSummaryMessage] = useState("");
 
   useEffect(() => {
     if (!job_id) {
@@ -386,18 +389,18 @@ function JobDetailsPage() {
     const currentJobId = job_id;
     let isCancelled = false;
 
-    async function fetchJobStatus() {
+    async function fetchInitialState() {
       try {
         const { jobPayload, artifactPayload } = await loadJobDetails(currentJobId);
-        if (!isCancelled) {
-          setJob(jobPayload);
-          setArtifactAvailability(artifactPayload);
-          setErrorMessage("");
+        if (isCancelled) {
+          return;
         }
-        if (!isCancelled) {
-          await loadSummary(currentJobId, { silentNotFound: true });
-          await checkSummaryPdf(currentJobId);
-        }
+
+        setJob(jobPayload);
+        setArtifactAvailability(artifactPayload);
+        setErrorMessage("");
+        await loadSummary(currentJobId, { silentNotFound: true, setSummary, setSummaryMessage });
+        await checkSummaryPdf(currentJobId, setSummaryPdfAvailable);
       } catch (error) {
         if (!isCancelled) {
           setErrorMessage(error instanceof Error ? error.message : "Failed to load job details.");
@@ -409,7 +412,7 @@ function JobDetailsPage() {
       }
     }
 
-    void fetchJobStatus();
+    void fetchInitialState();
 
     return () => {
       isCancelled = true;
@@ -417,7 +420,7 @@ function JobDetailsPage() {
   }, [job_id]);
 
   useEffect(() => {
-    if (!job_id || !job || (job.status !== "queued" && job.status !== "running")) {
+    if (!job || job.status !== "queued" && job.status !== "running") {
       return;
     }
 
@@ -425,16 +428,13 @@ function JobDetailsPage() {
 
     const timeoutId = window.setTimeout(() => {
       void loadJobDetails(job.job_id)
-        .then(async ({ jobPayload, artifactPayload }) => {
-          if (!isCancelled) {
-            setJob(jobPayload);
-            setArtifactAvailability(artifactPayload);
-            setErrorMessage("");
+        .then(({ jobPayload, artifactPayload }) => {
+          if (isCancelled) {
+            return;
           }
-          if (!isCancelled) {
-            await loadSummary(job.job_id, { silentNotFound: true });
-            await checkSummaryPdf(job.job_id);
-          }
+          setJob(jobPayload);
+          setArtifactAvailability(artifactPayload);
+          setErrorMessage("");
         })
         .catch((error: unknown) => {
           if (!isCancelled) {
@@ -447,55 +447,58 @@ function JobDetailsPage() {
       isCancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [job, job_id]);
+  }, [job]);
 
   const availableArtifacts = job_id
     ? [
         artifactAvailability?.artifacts.cleaned
-          ? { label: "Cleaned Video", href: `/api/jobs/${job_id}/download` }
-          : null,
+          ? { label: "Cleaned Video", href: artifactAvailability.artifacts.cleaned }
+          : job?.output_url
+            ? { label: "Cleaned Video", href: job.output_url }
+            : null,
         artifactAvailability?.artifacts.removed_preview
-          ? { label: "Removed Preview", href: `/api/jobs/${job_id}/removed-preview` }
+          ? { label: "Removed Preview", href: artifactAvailability.artifacts.removed_preview }
           : null,
         artifactAvailability?.artifacts.kept_preview
-          ? { label: "Kept Preview", href: `/api/jobs/${job_id}/kept-preview` }
+          ? { label: "Kept Preview", href: artifactAvailability.artifacts.kept_preview }
           : null,
         artifactAvailability?.artifacts.report
-          ? { label: "Report", href: `/api/jobs/${job_id}/report` }
+          ? { label: "Report", href: artifactAvailability.artifacts.report }
           : null,
         artifactAvailability?.artifacts.segments_csv
-          ? { label: "Segments CSV", href: `/api/jobs/${job_id}/segments.csv` }
+          ? { label: "Segments CSV", href: artifactAvailability.artifacts.segments_csv }
           : null,
         artifactAvailability?.artifacts.transcript_json
-          ? { label: "Transcript Log", href: `/api/jobs/${job_id}/logs/transcript` }
+          ? { label: "Transcript Log", href: artifactAvailability.artifacts.transcript_json }
           : null,
       ].filter((artifact): artifact is { label: string; href: string } => artifact !== null)
     : [];
 
   async function handleGenerateSummary() {
     if (!job_id) {
-      setSummaryErrorMessage("Job ID is missing.");
+      setSummaryMessage("Job ID is missing.");
       return;
     }
 
     setIsGeneratingSummary(true);
-    setSummaryErrorMessage("");
+    setSummaryMessage("");
 
     try {
-      const response = await fetch(`/api/jobs/${job_id}/summary`, {
+      const response = await requestJson<SummaryGenerationResponse>("/api/jobs/" + job_id + "/summary", {
         method: "POST",
+        errorMessage: "Failed to request summary generation.",
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to request summary generation.");
-      }
+      await loadSummary(job_id, { silentNotFound: true, setSummary, setSummaryMessage });
+      await checkSummaryPdf(job_id, setSummaryPdfAvailable);
 
-      await loadSummary(job_id);
-      await checkSummaryPdf(job_id);
+      if (response.status === "not_implemented" && response.message) {
+        setSummaryMessage(response.message);
+      } else if (!summary) {
+        setSummaryMessage("Summary request completed. Preview is not available yet.");
+      }
     } catch (error) {
-      setSummaryErrorMessage(
-        error instanceof Error ? error.message : "Failed to request summary generation.",
-      );
+      setSummaryMessage(error instanceof Error ? error.message : "Failed to request summary generation.");
     } finally {
       setIsGeneratingSummary(false);
     }
@@ -518,8 +521,8 @@ function JobDetailsPage() {
               <div className="status-grid">
                 <StatusCard label="Status" value={job.status} />
                 <StatusCard label="Progress" value={`${job.progress}%`} />
-                <StatusCard label="Created" value={new Date(job.created_at).toLocaleString()} />
-                <StatusCard label="Updated" value={new Date(job.updated_at).toLocaleString()} />
+                <StatusCard label="Created" value={formatDateTime(job.created_at)} />
+                <StatusCard label="Updated" value={formatDateTime(job.updated_at)} />
               </div>
 
               {job.error_message ? (
@@ -551,7 +554,13 @@ function JobDetailsPage() {
                 ) : (
                   <div className="artifact-list">
                     {availableArtifacts.map((artifact) => (
-                      <a key={artifact.href} href={artifact.href} target="_blank" rel="noreferrer" className="artifact-link">
+                      <a
+                        key={artifact.href}
+                        href={buildApiUrl(artifact.href)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="artifact-link"
+                      >
                         {artifact.label}
                       </a>
                     ))}
@@ -572,10 +581,15 @@ function JobDetailsPage() {
                   </button>
                 </div>
 
-                {summaryErrorMessage ? <p className="error-text">{summaryErrorMessage}</p> : null}
+                {summaryMessage ? <p className="helper-text">{summaryMessage}</p> : null}
 
                 {summaryPdfAvailable && job_id ? (
-                  <a href={`/api/jobs/${job_id}/summary.pdf`} target="_blank" rel="noreferrer" className="artifact-link">
+                  <a
+                    href={buildApiUrl(`/api/jobs/${job_id}/summary.pdf`)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="artifact-link"
+                  >
                     Open Summary PDF
                   </a>
                 ) : null}
@@ -597,15 +611,6 @@ function JobDetailsPage() {
         </section>
       </div>
     </main>
-  );
-}
-
-export default function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<UploadPage />} />
-      <Route path="/jobs/:job_id" element={<JobDetailsPage />} />
-    </Routes>
   );
 }
 
@@ -702,4 +707,89 @@ function formatSummaryObject(value: Record<string, unknown>) {
   return Object.entries(value)
     .map(([key, item]) => `${key}: ${String(item)}`)
     .join(" | ");
+}
+
+async function loadJobDetails(currentJobId: string) {
+  const [jobPayload, artifactPayload] = await Promise.all([
+    requestJson<JobStatus>(`/api/jobs/${currentJobId}`, {
+      errorMessage: "Failed to load job details.",
+    }),
+    requestJson<ArtifactAvailability>(`/api/jobs/${currentJobId}/artifacts`, {
+      errorMessage: "Failed to load job artifacts.",
+    }),
+  ]);
+
+  return { jobPayload, artifactPayload };
+}
+
+async function loadSummary(
+  currentJobId: string,
+  options: {
+    silentNotFound?: boolean;
+    setSummary: (value: StructuredSummary | null) => void;
+    setSummaryMessage: (value: string) => void;
+  },
+) {
+  const response = await fetch(buildApiUrl(`/api/jobs/${currentJobId}/summary.json`));
+
+  if (response.status === 404) {
+    options.setSummary(null);
+    if (!options.silentNotFound) {
+      options.setSummaryMessage("Summary is not available yet.");
+    }
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to load summary preview."));
+  }
+
+  const summaryPayload = (await response.json()) as StructuredSummary;
+  options.setSummary(summaryPayload);
+  options.setSummaryMessage("");
+}
+
+async function checkSummaryPdf(currentJobId: string, setSummaryPdfAvailable: (value: boolean) => void) {
+  const response = await fetch(buildApiUrl(`/api/jobs/${currentJobId}/summary.pdf`), {
+    method: "HEAD",
+  });
+  setSummaryPdfAvailable(response.ok);
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString();
+}
+
+function buildApiUrl(path: string) {
+  if (/^https?:\/\//.test(path)) {
+    return path;
+  }
+  return `${API_BASE_URL}${path}`;
+}
+
+async function requestJson<T>(
+  path: string,
+  init?: RequestInit & { errorMessage?: string },
+): Promise<T> {
+  const response = await fetch(buildApiUrl(path), init);
+  if (!response.ok) {
+    throw new Error(await readApiError(response, init?.errorMessage ?? "Request failed."));
+  }
+  return (await response.json()) as T;
+}
+
+async function readApiError(response: Response, fallbackMessage: string) {
+  try {
+    const payload = (await response.json()) as { detail?: unknown; message?: unknown };
+    if (typeof payload.detail === "string" && payload.detail.trim()) {
+      return payload.detail;
+    }
+    if (typeof payload.message === "string" && payload.message.trim()) {
+      return payload.message;
+    }
+  } catch {
+    // Ignore JSON parsing errors and fall back to default message.
+  }
+
+  return fallbackMessage;
 }
