@@ -35,7 +35,21 @@ ARTIFACT_FILENAMES: dict[ArtifactKey, str] = {
     "transcript_json": "transcript.json",
 }
 
-ARTIFACT_URL_PREFIX = "/artifacts"
+
+def build_artifact_url(job_id: str, artifact_key: ArtifactKey) -> str:
+    route_map: dict[ArtifactKey, str] = {
+        "cleaned": f"/api/jobs/{job_id}/download",
+        "report": f"/api/jobs/{job_id}/report",
+        "removed_preview": f"/api/jobs/{job_id}/removed-preview",
+        "kept_preview": f"/api/jobs/{job_id}/kept-preview",
+        "segments_csv": f"/api/jobs/{job_id}/segments.csv",
+        "black_log": f"/api/jobs/{job_id}/logs/black",
+        "silence_log": f"/api/jobs/{job_id}/logs/silence",
+        "freeze_json": f"/api/jobs/{job_id}/logs/freeze",
+        "buffering_json": f"/api/jobs/{job_id}/logs/buffering",
+        "transcript_json": f"/api/jobs/{job_id}/logs/transcript",
+    }
+    return route_map[artifact_key]
 
 
 def build_artifact_path(job_id: str, artifact_key: ArtifactKey) -> Path:
@@ -47,11 +61,6 @@ def existing_artifact_path(job_id: str, artifact_key: ArtifactKey) -> Path | Non
     if artifact_path.is_file():
         return artifact_path
     return None
-
-
-def build_artifact_url(job_id: str, artifact_key: ArtifactKey) -> str:
-    filename = ARTIFACT_FILENAMES[artifact_key]
-    return f"{ARTIFACT_URL_PREFIX}/{job_id}/{filename}"
 
 
 def existing_artifact_url(job_id: str, artifact_key: ArtifactKey) -> str | None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import os
 import shutil
 from pathlib import Path
 from typing import Any, BinaryIO, Iterable, Mapping
@@ -54,14 +55,21 @@ def write_segments_csv(job_dir: Path, segments: list[dict[str, Any]]) -> Path:
 def save_binary_stream(stream: BinaryIO, destination: Path) -> Path:
     """Persist a binary stream to a destination path."""
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with destination.open("wb") as handle:
-        shutil.copyfileobj(stream, handle)
+    temp_path = destination.parent / f".{destination.name}.part"
+
+    try:
+        with temp_path.open("wb") as handle:
+            shutil.copyfileobj(stream, handle)
+        os.replace(temp_path, destination)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+
     return destination
 
 
 def cleanup_temporary_inputs(job: Job, extra_paths: Iterable[Path]) -> list[Path]:
     """Delete temporary input files and any additional paths if they exist."""
-    removed_paths: list[Path] = []
     targets: list[Path] = []
 
     if job.input_path is not None:
@@ -69,17 +77,17 @@ def cleanup_temporary_inputs(job: Job, extra_paths: Iterable[Path]) -> list[Path
 
     targets.extend(extra_paths)
 
-    for path in targets:
+    return cleanup_paths(targets)
+
+
+def cleanup_paths(paths: Iterable[Path]) -> list[Path]:
+    """Delete the provided file or directory paths if they exist."""
+    removed_paths: list[Path] = []
+
+    for path in paths:
         candidate = Path(path)
-        if not candidate.exists():
-            continue
-
-        if candidate.is_dir():
-            shutil.rmtree(candidate)
-        else:
-            candidate.unlink()
-
-        removed_paths.append(candidate)
+        if _remove_path(candidate):
+            removed_paths.append(candidate)
 
     return removed_paths
 
@@ -95,3 +103,18 @@ def _serialize_reasons(value: Any) -> str:
         return "; ".join(str(item) for item in value)
 
     return str(value)
+
+
+def _remove_path(path: Path) -> bool:
+    if not path.exists():
+        return False
+
+    try:
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=False)
+        else:
+            path.unlink()
+    except OSError:
+        return False
+
+    return True
