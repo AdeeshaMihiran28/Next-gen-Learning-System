@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Literal
 
@@ -41,14 +42,20 @@ def build_artifact_path(job_id: str, artifact_key: ArtifactKey) -> Path:
     return OUTPUT_DIR / job_id / ARTIFACT_FILENAMES[artifact_key]
 
 
+def existing_artifact_path(job_id: str, artifact_key: ArtifactKey) -> Path | None:
+    artifact_path = build_artifact_path(job_id, artifact_key)
+    if artifact_path.is_file():
+        return artifact_path
+    return None
+
+
 def build_artifact_url(job_id: str, artifact_key: ArtifactKey) -> str:
     filename = ARTIFACT_FILENAMES[artifact_key]
     return f"{ARTIFACT_URL_PREFIX}/{job_id}/{filename}"
 
 
 def existing_artifact_url(job_id: str, artifact_key: ArtifactKey) -> str | None:
-    artifact_path = build_artifact_path(job_id, artifact_key)
-    if artifact_path.is_file():
+    if existing_artifact_path(job_id, artifact_key) is not None:
         return build_artifact_url(job_id, artifact_key)
     return None
 
@@ -65,3 +72,19 @@ def build_existing_artifact_urls(job_id: str) -> dict[ArtifactKey, str | None]:
         artifact_key: existing_artifact_url(job_id, artifact_key)
         for artifact_key in ARTIFACT_FILENAMES
     }
+
+
+def build_summary_path(job_id: str, filename: str) -> Path:
+    return OUTPUT_DIR / job_id / filename
+
+
+def existing_summary_path(job_id: str, filename: str) -> Path | None:
+    summary_path = build_summary_path(job_id, filename)
+    if summary_path.is_file():
+        return summary_path
+    return None
+
+
+def load_json_file(path: Path) -> dict | list:
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)

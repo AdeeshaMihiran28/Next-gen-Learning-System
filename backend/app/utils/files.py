@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 import shutil
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, BinaryIO, Iterable, Mapping
 
 from ..domain.jobs import Job
 
@@ -49,6 +49,14 @@ def write_segments_csv(job_dir: Path, segments: list[dict[str, Any]]) -> Path:
             )
 
     return csv_path
+
+
+def save_binary_stream(stream: BinaryIO, destination: Path) -> Path:
+    """Persist a binary stream to a destination path."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("wb") as handle:
+        shutil.copyfileobj(stream, handle)
+    return destination
 
 
 def cleanup_temporary_inputs(job: Job, extra_paths: Iterable[Path]) -> list[Path]:
