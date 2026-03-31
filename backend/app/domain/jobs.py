@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,7 +13,7 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-@dataclass
+@dataclass(slots=True)
 class Job:
     job_id: str
     status: str
@@ -29,6 +29,7 @@ class Job:
 
 
 JOB_STORE: dict[str, Job] = {}
+JOB_FIELDS = {field_.name for field_ in fields(Job)}
 
 
 class JobStore:
@@ -72,14 +73,19 @@ class JobStore:
             return None
 
         for field_name, value in changes.items():
-            if hasattr(job, field_name):
-                setattr(job, field_name, value)
+            if field_name not in JOB_FIELDS:
+                raise KeyError(f"Unknown job field '{field_name}'")
+            setattr(job, field_name, value)
 
         job.updated_at = _utc_now()
         return job
 
 
 def append_job_log(job: Job, entry: str) -> Job:
-    job.logs.append(entry)
+    message = entry.strip()
+    if not message:
+        return job
+
+    job.logs.append(message)
     job.updated_at = _utc_now()
     return job
