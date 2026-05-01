@@ -8,6 +8,8 @@ from typing import Any
 
 from app.services.ffmpeg import run_ffmpeg_command
 
+DEFAULT_WHISPER_MODEL = "base"
+
 
 def extract_audio_to_wav(video_path: Path, wav_path: Path) -> Path:
     """Extract mono 16 kHz WAV audio from a video using ffmpeg."""
@@ -38,7 +40,7 @@ def transcribe_wav_with_whisper(
     wav_path: Path,
     transcript_path: Path,
     *,
-    model_name: str = "base",
+    model_name: str = DEFAULT_WHISPER_MODEL,
     language: str | None = "en",
 ) -> tuple[str, list[dict[str, Any]]]:
     """Transcribe a WAV file with local Whisper and persist transcript.json."""
@@ -46,15 +48,27 @@ def transcribe_wav_with_whisper(
         import whisper
     except ImportError as exc:
         raise RuntimeError(
-            "The 'whisper' package is not installed. Install local Whisper to enable transcription."
+            "OpenAI Whisper is not installed. Install the 'openai-whisper' package to enable transcription."
         ) from exc
 
-    model = whisper.load_model(model_name)
-    result = model.transcribe(
-        str(wav_path),
-        language=language or None,
-        verbose=False,
-    )
+    if not hasattr(whisper, "load_model"):
+        raise RuntimeError(
+            "The installed 'whisper' module is not OpenAI Whisper. Install 'openai-whisper' and remove the unrelated 'whisper' package."
+        )
+
+    selected_model = _normalize_model_name(model_name)
+    selected_language = _normalize_language(language)
+
+    try:
+        model = whisper.load_model(selected_model)
+        result = model.transcribe(
+            str(wav_path),
+            language=selected_language,
+            verbose=False,
+            fp16=False,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Whisper transcription failed using model '{selected_model}': {exc}") from exc
 
     transcript_text = (result.get("text") or "").strip()
     speech_segments = _normalize_speech_segments(result.get("segments", []))
@@ -68,6 +82,18 @@ def transcribe_wav_with_whisper(
     transcript_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     return transcript_text, speech_segments
+
+
+def _normalize_model_name(model_name: str | None) -> str:
+    normalized_model = (model_name or DEFAULT_WHISPER_MODEL).strip()
+    return normalized_model or DEFAULT_WHISPER_MODEL
+
+
+def _normalize_language(language: str | None) -> str | None:
+    normalized_language = (language or "").strip().lower()
+    if normalized_language in {"", "auto", "detect", "none"}:
+        return None
+    return normalized_language
 
 
 def merge_nearby_speech_segments(
