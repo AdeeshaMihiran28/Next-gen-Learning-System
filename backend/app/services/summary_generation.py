@@ -37,16 +37,12 @@ def generate_job_summary(job: Job) -> dict[str, Any]:
         transcript_chunks = chunk_transcript_by_time(transcript_segments)
         append_job_log(job, f"Transcript split into {len(transcript_chunks)} chunk(s)")
 
-        chunk_summaries = [
-            summarize_transcript_chunk(chunk)
-            for chunk in transcript_chunks
-            if str(chunk.get("text", "")).strip()
-        ]
+        chunk_summaries = _summarize_chunks_with_fallback(job, transcript_chunks)
         if not chunk_summaries:
             raise SummaryGenerationError("Transcript chunks did not produce any summaries.")
 
         append_job_log(job, f"Generated {len(chunk_summaries)} chunk summary/ies")
-        final_summary = reduce_chunk_summaries(chunk_summaries)
+        final_summary = _reduce_summaries_with_fallback(job, chunk_summaries)
         structured_summary = build_structured_summary(
             transcript_chunks=transcript_chunks,
             chunk_summaries=chunk_summaries,
@@ -66,6 +62,64 @@ def generate_job_summary(job: Job) -> dict[str, Any]:
         raise
     except Exception as exc:
         raise SummaryGenerationError(str(exc)) from exc
+
+
+def _summarize_chunks_with_fallback(
+    job: Job,
+    transcript_chunks: list[dict[str, Any]],
+) -> list[str]:
+    chunk_summaries: list[str] = []
+    fallback_used = False
+
+    for chunk in transcript_chunks:
+        text = str(chunk.get("text", "")).strip()
+        if not text:
+            continue
+
+        try:
+            chunk_summaries.append(summarize_transcript_chunk(chunk))
+        except Exception as exc:
+            fallback_used = True
+            append_job_log(job, f"Gemini chunk summary failed; using local fallback: {exc}")
+            chunk_summaries.append(_local_chunk_summary(chunk))
+
+    if fallback_used:
+        append_job_log(job, "Local transcript summary fallback was used")
+
+    return [summary for summary in chunk_summaries if summary.strip()]
+
+
+def _reduce_summaries_with_fallback(job: Job, chunk_summaries: list[str]) -> str:
+    try:
+        return reduce_chunk_summaries(chunk_summaries)
+    except Exception as exc:
+        append_job_log(job, f"Gemini final summary failed; using local fallback: {exc}")
+        return _local_final_summary(chunk_summaries)
+
+
+def _local_chunk_summary(chunk: dict[str, Any]) -> str:
+    text = str(chunk.get("text", "")).strip()
+    sentences = _extract_sentences(text)
+    selected_sentences = sentences[:3]
+
+    if not selected_sentences and text:
+        selected_sentences = [text[:500].strip()]
+
+    start = _format_timestamp(float(chunk.get("start", 0.0)))
+    end = _format_timestamp(float(chunk.get("end", 0.0)))
+    summary_text = " ".join(selected_sentences).strip()
+    return f"{start} - {end}: {summary_text}"
+
+
+def _local_final_summary(chunk_summaries: list[str]) -> str:
+    combined = " ".join(summary.strip() for summary in chunk_summaries if summary.strip())
+    sentences = _extract_sentences(combined)
+    selected_sentences = sentences[:8]
+
+    if selected_sentences:
+        return " ".join(selected_sentences)
+
+    return combined[:1500].strip()
 
 
 def build_structured_summary(
