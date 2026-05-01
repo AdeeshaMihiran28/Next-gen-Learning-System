@@ -5,7 +5,7 @@ pydantic
 opencv-python
 numpy
 python-dotenv
-whisper
+openai-whisper
 google-generativeai
 google-genai
 reportlab
