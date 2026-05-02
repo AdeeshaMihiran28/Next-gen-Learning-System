@@ -1,0 +1,14 @@
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0
+opencv-python
+mediapipe
+numpy
+python-multipart
+pydantic>=2.0.0
+openai-whisper>=20230314
+torch
+ffmpeg-python
+passlib[bcrypt]
+python-jose[cryptography]
+motor
