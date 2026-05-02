@@ -102,6 +102,7 @@ def me(user=Depends(get_current_user)):
     users = col("users")
     try:
         u = users.find_one({"_id": ObjectId(user["id"])}, {"password_hash": 0})
+    except:
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid user")
 

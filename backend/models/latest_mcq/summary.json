@@ -1,0 +1,15 @@
+{
+  "n_pair_samples": 4902,
+  "n_train_samples": 3917,
+  "n_test_samples": 985,
+  "n_questions_total": 994,
+  "n_train_questions": 795,
+  "n_test_questions": 199,
+  "models_tried": [
+    "LogisticRegression",
+    "LinearSVC",
+    "RandomForest",
+    "MultinomialNB"
+  ],
+  "best_model": "RandomForest"
+}
