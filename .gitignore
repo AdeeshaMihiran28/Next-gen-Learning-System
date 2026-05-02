@@ -33,3 +33,7 @@ build/
 # Local runtime data
 *.log
 *.db
+__pycache__/
+*.py[cod]
+.venv/
+backend/.env
