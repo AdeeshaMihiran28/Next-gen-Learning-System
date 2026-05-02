@@ -45,4 +45,36 @@ ALERT_MESSAGES = {
         "en": "All clear. Continue with your exam.",
         "si": "සියල්ල හරි. ඔබේ විභාගය දිගටම කරන්න."
     }
+    ,
+    "VOICE_DETECTED": {
+        "en": "Voice activity detected.",
+        "si": "හඬක් හඳුනාගැනූ බවක් ඇත."
+    },
+    "CHEATING_SUSPECTED": {
+        "en": "Suspicious speech detected. Possible cheating.",
+        "si": "සංශයීලී කථනයක් හඳුනාගෙන ඇත. හැකි සොතාහ්‍යා ව්‍යවහාරයක්."
+    },
+    "PHONE_DETECTED": {
+        "en": "Warning. Mobile phone detected. Please put it away.",
+        "si": "අවවාදයයි. ජංගම දුරකථනයක් හඳුනාගෙන ඇත. කරුණාකර එය ඉවත් කරන්න."
+    }
+}
+
+# Authentication / JWT settings
+import os
+from datetime import timedelta
+
+# If you want a persistent secret, set environment variable APP_SECRET_KEY
+SECRET_KEY = os.environ.get('APP_SECRET_KEY') or os.environ.get('SECRET_KEY') or "change-me-to-a-secure-random-string"
+ALGORITHM = "HS256"
+# Token expiry in minutes
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('ACCESS_TOKEN_EXPIRE_MINUTES') or 60 * 24)
+
+# MongoDB configuration. Prefer setting MONGO_URI in environment for secrets.
+# For quick local setup you can replace the default below, but avoid committing secrets.
+# Example URI (no DB name): mongodb+srv://user:pass@cluster0.example.mongodb.net/
+MONGO_URI = os.environ.get('MONGO_URI') or "mongodb+srv://Hiruna:Wphd123@cluster0.c7mb8lr.mongodb.net/"
+# Default database name to use when MONGO_URI does not include one
+MONGO_DB = os.environ.get('MONGO_DB') or 'next_gen_smartclassroom'
+
 }

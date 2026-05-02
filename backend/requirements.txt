@@ -6,6 +6,12 @@ mediapipe
 numpy
 python-multipart
 pydantic>=2.0.0
+openai-whisper>=20230314
+torch
+ffmpeg-python
+passlib[bcrypt]
+python-jose[cryptography]
+motor
 
 pymongo>=4.6.0
 pyjwt>=2.8.0
