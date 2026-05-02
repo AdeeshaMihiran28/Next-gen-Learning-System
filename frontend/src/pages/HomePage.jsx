@@ -49,6 +49,7 @@ function HomePage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         {/* Animated Background */}
+      <section className="relative overflow-hidden">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-cyan-400/30 to-blue-500/30 dark:from-cyan-500/20 dark:to-blue-600/20 rounded-full blur-3xl animate-pulse"></div>
           <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-purple-400/30 to-pink-500/30 dark:from-purple-500/20 dark:to-pink-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
@@ -92,6 +93,18 @@ function HomePage() {
               >
                 <span className="text-lg sm:text-xl">📊</span>
                 MCQ & Diagrams
+            <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
+              Answer questions using voice with a focused, streamlined learning
+              experience.
+            </p>
+
+            <div className="flex flex-wrap gap-3 justify-center pt-6">
+              <Link
+                to="/voice-quiz"
+                className="group px-5 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold text-sm sm:text-base shadow-lg shadow-purple-500/40 hover:shadow-purple-500/60 transition-all duration-300 hover:scale-105 flex items-center gap-2"
+              >
+                <span className="text-lg sm:text-xl">🎤</span>
+                Answer using Voice
                 <span className="group-hover:translate-x-1 transition-transform duration-300">
                   →
                 </span>
@@ -109,6 +122,13 @@ function HomePage() {
             )}
 
             {/* Highlights */}
+            {me && (
+              <div className="text-sm text-gray-700 dark:text-gray-300">
+                Logged in as:{" "}
+                <span className="font-bold">{me.email || me.name || me.id}</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-8 max-w-4xl mx-auto">
               {highlights.map((item, index) => (
                 <div
@@ -207,6 +227,14 @@ function HomePage() {
                   className="px-5 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 >
                   📊 MCQ & Diagrams
+                Use the voice answer feature directly from your account.
+              </p>
+              <div className="flex flex-wrap gap-3 justify-center">
+                <Link
+                  to="/voice-quiz"
+                  className="px-5 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                >
+                  🎤 Voice Quiz
                 </Link>
               </div>
 
@@ -216,6 +244,7 @@ function HomePage() {
                   <span className="font-bold">
                     {me.email || me.name || me.id}
                   </span>
+                  <span className="font-bold">{me.email || me.name || me.id}</span>
                 </div>
               )}
             </div>

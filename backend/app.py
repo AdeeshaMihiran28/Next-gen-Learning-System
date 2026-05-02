@@ -17,6 +17,31 @@ from mcq_diagram_api import create_mcq_diagram_app
 load_dotenv()
 
 app = FastAPI(title="Backend + Mongo + JWT (No Mongo Auth)")
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from dotenv import load_dotenv
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from dbconnect import init_db
+from auth import router as auth_router
+
+from starlette.middleware.wsgi import WSGIMiddleware
+from voicemodel import voice_app
+from quiz_api import router as quiz_router
+
+
+load_dotenv()
+
+
+@asynccontextmanager
+async def lifespan(app):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Voice Quiz Backend", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,6 +66,11 @@ app.include_router(auth_router)
 @app.on_event("startup")
 def startup():
     init_db()
+# Mount Flask ICT/Voice service under /ict
+app.mount("/ict", WSGIMiddleware(voice_app))
+app.include_router(auth_router)
+app.include_router(quiz_router)
+
 
 @app.get("/api/health")
 def health():

@@ -56,6 +56,9 @@ class LoginIn(BaseModel):
 
 @router.post("/register")
 def register(body: RegisterIn):
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
     users = col("users")
 
     email = body.email.lower().strip()
@@ -100,6 +103,7 @@ def me(user=Depends(get_current_user)):
     try:
         u = users.find_one({"_id": ObjectId(user["id"])}, {"password_hash": 0})
     except:
+    except Exception:
         raise HTTPException(status_code=401, detail="Invalid user")
 
     if not u:

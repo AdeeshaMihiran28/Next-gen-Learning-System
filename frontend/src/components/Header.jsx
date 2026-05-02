@@ -57,6 +57,9 @@
 
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import ThemeToggle from "./ThemeToggle";
 import { apiFetch } from "../utils/api";
 import { clearToken, isLoggedIn } from "../utils/auth";
 
@@ -76,6 +79,7 @@ function Header() {
     { path: "/home", label: "Home", icon: "🏠" },
     { path: "/mcqanddiagrams", label: "MCQ & Diagrams", icon: "📊" },
   ];
+  const navLinks = [{ path: "/home", label: "Home", icon: "🏠" }];
 
   const [me, setMe] = useState(null);
   const [open, setOpen] = useState(false);
@@ -102,6 +106,8 @@ function Header() {
   }, []);
 
   // close dropdown when click outside
+  }, []);
+
   useEffect(() => {
     function onDocClick(e) {
       if (!menuRef.current) return;
@@ -113,6 +119,7 @@ function Header() {
 
   function logout() {
     clearToken();
+    try { localStorage.removeItem("voice_quiz_draft_v1"); } catch {}
     setMe(null);
     setOpen(false);
     nav("/login");
@@ -134,6 +141,10 @@ function Header() {
               </h1>
               <p className="text-gray-600 dark:text-gray-400 text-xs mt-0.5 transition-colors duration-300 hidden sm:block">
                 MCQ & Diagram Practice Platform
+                AI Proctoring & Learning System
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 text-xs mt-0.5 transition-colors duration-300 hidden sm:block">
+                Voice Answer Platform
               </p>
             </div>
           </Link>
@@ -158,12 +169,15 @@ function Header() {
             </nav>
 
             {/* ✅ Auth Area */}
+            <ThemeToggle />
+
             {!me ? (
               <Link
                 to="/login"
                 className="px-4 py-2 rounded-lg text-sm font-bold bg-cyan-600 text-white hover:bg-cyan-700 transition"
               >
                 🔐 Login
+                Login
               </Link>
             ) : (
               <div className="relative" ref={menuRef}>
@@ -207,6 +221,7 @@ function Header() {
                       className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                     >
                       🚪 Logout
+                      Logout
                       <div className="text-xs text-red-500/80 mt-1">
                         Sign out from the system
                       </div>
