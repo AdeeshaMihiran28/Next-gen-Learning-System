@@ -31,3 +31,14 @@ mediapipe>=0.10.9
 # Python 3.12: torch>=2.1.0 required
 torch>=2.1.0
 sentence-transformers>=2.7.0
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+opencv-python
+numpy
+python-dotenv
+openai-whisper
+google-generativeai
+google-genai
+reportlab
