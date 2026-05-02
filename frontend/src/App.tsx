@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
-import { Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 
 type TemplateInfo = {
   template_id: string;
@@ -43,6 +43,33 @@ type SummaryGenerationResponse = {
   job_id: string;
   status: string;
   message?: string;
+};
+
+type ProcessingReport = {
+  status?: string;
+  duration_seconds?: number | null;
+  output_valid?: boolean | null;
+  detections?: {
+    black?: unknown[];
+    silence?: unknown[];
+    freeze?: unknown[];
+    buffering?: unknown[];
+  };
+  removed_segments?: Array<{ duration?: number }>;
+  kept_segments?: unknown[];
+  speech_segments?: unknown[];
+  no_speech_segments?: unknown[];
+  overlap_violations?: unknown[];
+};
+
+type GalleryItem = {
+  job_id: string;
+  title: string;
+  created_at: string;
+  duration_seconds?: number | null;
+  total_removed_seconds?: number | null;
+  video_url?: string | null;
+  summary_pdf_url?: string | null;
 };
 
 type ProcessingOptionsState = {
@@ -97,6 +124,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<UploadPage />} />
+      <Route path="/gallery" element={<LectureGalleryPage />} />
       <Route path="/jobs/:job_id" element={<JobDetailsPage />} />
     </Routes>
   );
@@ -104,11 +132,14 @@ export default function App() {
 
 function UploadPage() {
   const navigate = useNavigate();
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const templateInputRef = useRef<HTMLInputElement | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [templateFiles, setTemplateFiles] = useState<File[]>([]);
   const [templates, setTemplates] = useState<TemplateInfo[]>([]);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
-  const [autoStart, setAutoStart] = useState(true);
+  const autoStart = true;
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [options, setOptions] = useState<ProcessingOptionsState>(DEFAULT_OPTIONS);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
@@ -154,6 +185,22 @@ function UploadPage() {
         ? current.filter((value) => value !== templateId)
         : [...current, templateId],
     );
+  }
+
+  function removeSelectedVideo() {
+    setVideoFile(null);
+    setErrorMessage("");
+    if (videoInputRef.current) {
+      videoInputRef.current.value = "";
+    }
+  }
+
+  function removeSelectedTemplateFiles() {
+    setTemplateFiles([]);
+    setTemplateMessage("");
+    if (templateInputRef.current) {
+      templateInputRef.current.value = "";
+    }
   }
 
   async function handleTemplateUpload(event: FormEvent<HTMLFormElement>) {
@@ -236,10 +283,17 @@ function UploadPage() {
     <main className="page">
       <div className="shell">
         <header className="page-header">
-          <h1 className="page-title">Lecture Video Cleaner</h1>
-          <p className="page-intro">
-            Upload a lecture video, manage buffering templates, and choose processing options before starting a job.
-          </p>
+          <div className="page-header-row">
+            <div>
+              <h1 className="page-title">Lecture Video Cleaner</h1>
+              <p className="page-intro">
+                Upload a lecture video, manage buffering templates, and choose processing options before starting a job.
+              </p>
+            </div>
+            <Link to="/gallery" className="button button-primary page-action">
+              Lecture Gallery
+            </Link>
+          </div>
         </header>
 
         <div className="stack">
@@ -253,17 +307,23 @@ function UploadPage() {
               <label className="field">
                 <span className="field-label">Template image files</span>
                 <input
+                  ref={templateInputRef}
                   className="input"
                   type="file"
                   accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                   multiple
                   onChange={(event) => setTemplateFiles(Array.from(event.target.files ?? []))}
                 />
-                <span className="helper-text">
-                  {templateFiles.length > 0
-                    ? `${templateFiles.length} file(s) selected`
-                    : "Accepted formats: PNG, JPG, JPEG"}
-                </span>
+                {templateFiles.length > 0 ? (
+                  <span className="selected-file-row">
+                    <span className="helper-text">{templateFiles.length} file(s) selected</span>
+                    <button type="button" className="button button-danger" onClick={removeSelectedTemplateFiles}>
+                      Remove
+                    </button>
+                  </span>
+                ) : (
+                  <span className="helper-text">Accepted formats: PNG, JPG, JPEG</span>
+                )}
               </label>
 
               <button
@@ -301,66 +361,90 @@ function UploadPage() {
           <form onSubmit={handleSubmit} className="stack">
             <section className="panel">
               <h2 className="section-title">Video Upload</h2>
+              <p className="helper-text">
+                Selected templates: {selectedTemplateIds.length > 0 ? selectedTemplateIds.join(", ") : "none"}
+              </p>
+
               <label className="field">
                 <span className="field-label">Lecture video</span>
                 <input
+                  ref={videoInputRef}
                   className="input"
                   type="file"
                   accept="video/*"
                   onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)}
                 />
-                <span className="helper-text">
-                  {videoFile ? `Selected: ${videoFile.name}` : "Choose a single video file to upload."}
-                </span>
+                {videoFile ? (
+                  <span className="selected-file-row">
+                    <span className="helper-text">Selected: {videoFile.name}</span>
+                    <button type="button" className="button button-danger" onClick={removeSelectedVideo}>
+                      Remove
+                    </button>
+                  </span>
+                ) : (
+                  <span className="helper-text">Choose a single video file to upload.</span>
+                )}
               </label>
 
-              <label className="checkbox-row">
-                <input type="checkbox" checked={autoStart} onChange={(event) => setAutoStart(event.target.checked)} />
-                <span>Auto-start processing after upload</span>
-              </label>
+              <div className="button-row">
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => setShowAdvancedSettings((current) => !current)}
+                >
+                  {showAdvancedSettings ? "Close Advanced Settings" : "Advanced Settings"}
+                </button>
 
-              <p className="helper-text">
-                Selected templates: {selectedTemplateIds.length > 0 ? selectedTemplateIds.join(", ") : "none"}
-              </p>
-            </section>
-
-            <section className="panel">
-              <h2 className="section-title">Detection Options</h2>
-              <div className="form-grid">
-                <NumberField label="Black duration" value={options.black_d} step="0.1" onChange={(value) => updateOption("black_d", value)} />
-                <NumberField label="Black pixel threshold" value={options.black_pix_th} step="0.01" onChange={(value) => updateOption("black_pix_th", value)} />
-                <NumberField label="Silence noise dB" value={options.silence_noise_db} step="1" onChange={(value) => updateOption("silence_noise_db", value)} />
-                <NumberField label="Silence minimum duration" value={options.silence_d} step="0.1" onChange={(value) => updateOption("silence_d", value)} />
-                <CheckboxField label="Enable freeze detection" checked={options.freeze_enabled} onChange={(value) => updateOption("freeze_enabled", value)} />
-                <NumberField label="Freeze sampling FPS" value={options.freeze_sampling_fps} step="1" onChange={(value) => updateOption("freeze_sampling_fps", value)} />
-                <NumberField label="Freeze diff threshold" value={options.freeze_diff_threshold} step="0.01" onChange={(value) => updateOption("freeze_diff_threshold", value)} />
-                <NumberField label="Freeze minimum duration" value={options.freeze_min_duration} step="0.1" onChange={(value) => updateOption("freeze_min_duration", value)} />
-                <CheckboxField label="Generate kept preview" checked={options.generate_kept_preview} onChange={(value) => updateOption("generate_kept_preview", value)} />
-                <CheckboxField label="Enable buffering detection" checked={options.enable_buffering_detect} onChange={(value) => updateOption("enable_buffering_detect", value)} />
-                <NumberField label="Buffering sample FPS" value={options.buffering_sample_fps} step="1" onChange={(value) => updateOption("buffering_sample_fps", value)} />
-                <NumberField label="Buffering match threshold" value={options.buffering_match_thresh} step="0.01" onChange={(value) => updateOption("buffering_match_thresh", value)} />
-                <NumberField label="Buffering minimum duration" value={options.buffering_min_d} step="0.1" onChange={(value) => updateOption("buffering_min_d", value)} />
+                <button type="submit" disabled={isSubmitting || !videoFile} className="button button-primary">
+                  {isSubmitting ? "Uploading..." : autoStart ? "Upload & Process" : "Upload Video"}
+                </button>
               </div>
             </section>
 
-            <section className="panel">
-              <h2 className="section-title">Speech Options</h2>
-              <div className="form-grid">
-                <TextField label="Whisper model" value={options.whisper_model} onChange={(value) => updateOption("whisper_model", value)} />
-                <TextField label="Whisper language" value={options.whisper_language} onChange={(value) => updateOption("whisper_language", value)} />
-                <NumberField label="No-speech minimum duration" value={options.no_speech_min_d} step="0.1" onChange={(value) => updateOption("no_speech_min_d", value)} />
-                <NumberField label="Freeze minimum no-speech overlap" value={options.freeze_min_no_speech_overlap} step="0.1" onChange={(value) => updateOption("freeze_min_no_speech_overlap", value)} />
-                <NumberField label="Freeze force-remove seconds" value={options.freeze_force_remove_sec} step="0.1" onChange={(value) => updateOption("freeze_force_remove_sec", value)} />
-                <CheckboxField label="Strict no-cut speech" checked={options.strict_no_cut_speech} onChange={(value) => updateOption("strict_no_cut_speech", value)} />
-                <NumberField label="Speech overlap threshold" value={options.speech_overlap_threshold_sec} step="0.1" onChange={(value) => updateOption("speech_overlap_threshold_sec", value)} />
-              </div>
-            </section>
+            {showAdvancedSettings ? (
+              <section className="panel">
+                <h2 className="section-title">Advanced Settings</h2>
+
+                <div className="form-grid">
+                  <NumberField label="Silence noise (dB)" value={options.silence_noise_db} step="1" onChange={(value) => updateOption("silence_noise_db", value)} />
+                  <NumberField label="Silence min (s)" value={options.silence_d} step="0.1" onChange={(value) => updateOption("silence_d", value)} />
+                  <NumberField label="Black min (s)" value={options.black_d} step="0.1" onChange={(value) => updateOption("black_d", value)} />
+                  <NumberField label="Black pix threshold" value={options.black_pix_th} step="0.01" onChange={(value) => updateOption("black_pix_th", value)} />
+                  <NumberField label="Freeze sample FPS" value={options.freeze_sampling_fps} step="1" onChange={(value) => updateOption("freeze_sampling_fps", value)} />
+                  <NumberField label="Freeze diff threshold" value={options.freeze_diff_threshold} step="0.01" onChange={(value) => updateOption("freeze_diff_threshold", value)} />
+                  <NumberField label="Freeze min (s)" value={options.freeze_min_duration} step="0.1" onChange={(value) => updateOption("freeze_min_duration", value)} />
+                  <NumberField label="Buffering sample FPS" value={options.buffering_sample_fps} step="1" onChange={(value) => updateOption("buffering_sample_fps", value)} />
+                  <NumberField label="Buffering match threshold" value={options.buffering_match_thresh} step="0.01" onChange={(value) => updateOption("buffering_match_thresh", value)} />
+                  <NumberField label="Buffering min (s)" value={options.buffering_min_d} step="0.1" onChange={(value) => updateOption("buffering_min_d", value)} />
+                  <SelectField
+                    label="Whisper model"
+                    value={options.whisper_model}
+                    onChange={(value) => updateOption("whisper_model", value)}
+                    options={[
+                      { label: "tiny", value: "tiny" },
+                      { label: "base", value: "base" },
+                      { label: "small", value: "small" },
+                      { label: "medium", value: "medium" },
+                      { label: "large", value: "large" },
+                    ]}
+                  />
+                  <TextField label="Whisper language" value={options.whisper_language} onChange={(value) => updateOption("whisper_language", value)} />
+                  <NumberField label="No-speech min (s)" value={options.no_speech_min_d} step="0.1" onChange={(value) => updateOption("no_speech_min_d", value)} />
+                  <NumberField label="Freeze min no-speech overlap (s)" value={options.freeze_min_no_speech_overlap} step="0.1" onChange={(value) => updateOption("freeze_min_no_speech_overlap", value)} />
+                  <NumberField label="Freeze force remove (s)" value={options.freeze_force_remove_sec} step="0.1" onChange={(value) => updateOption("freeze_force_remove_sec", value)} />
+                  <NumberField label="Speech overlap threshold (s)" value={options.speech_overlap_threshold_sec} step="0.1" onChange={(value) => updateOption("speech_overlap_threshold_sec", value)} />
+                </div>
+
+                <div className="checkbox-grid">
+                  <CheckboxField label="Enable freeze detection" checked={options.freeze_enabled} onChange={(value) => updateOption("freeze_enabled", value)} />
+                  <CheckboxField label="Enable buffering detection" checked={options.enable_buffering_detect} onChange={(value) => updateOption("enable_buffering_detect", value)} />
+                  <CheckboxField label="Strict no-cut-speech mode" checked={options.strict_no_cut_speech} onChange={(value) => updateOption("strict_no_cut_speech", value)} />
+                  <CheckboxField label="Generate kept-preview video" checked={options.generate_kept_preview} onChange={(value) => updateOption("generate_kept_preview", value)} />
+                </div>
+              </section>
+            ) : null}
 
             {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
-
-            <button type="submit" disabled={isSubmitting || !videoFile} className="button button-primary">
-              {isSubmitting ? "Uploading..." : "Upload Video"}
-            </button>
           </form>
         </div>
       </div>
@@ -368,10 +452,137 @@ function UploadPage() {
   );
 }
 
+function LectureGalleryPage() {
+  const [items, setItems] = useState<GalleryItem[]>([]);
+  const [query, setQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadGallery() {
+      try {
+        const payload = await requestJson<{ items: GalleryItem[] }>("/api/gallery", {
+          errorMessage: "Failed to load lecture gallery.",
+        });
+        if (!isCancelled) {
+          setItems(payload.items);
+          setErrorMessage("");
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setErrorMessage(error instanceof Error ? error.message : "Failed to load lecture gallery.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadGallery();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredItems = normalizedQuery
+    ? items.filter((item) =>
+        [item.title, item.job_id, formatDateTime(item.created_at)]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedQuery),
+      )
+    : items;
+
+  return (
+    <main className="page">
+      <div className="shell">
+        <header className="page-header">
+          <div className="page-header-row">
+            <div>
+              <h1 className="page-title">Lecture Gallery</h1>
+              <p className="page-intro">Saved cleaned videos are listed here automatically.</p>
+            </div>
+            <Link to="/" className="button button-primary page-action">
+              Upload
+            </Link>
+          </div>
+        </header>
+
+        <section className="panel">
+          <div className="gallery-search-row">
+            <input
+              className="input"
+              type="search"
+              placeholder="Search by lecture name, job ID, or date"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <span className="helper-text">
+              {filteredItems.length} / {items.length}
+            </span>
+          </div>
+
+          {isLoading ? <p className="helper-text">Loading gallery...</p> : null}
+          {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
+
+          <div className="gallery-list">
+            {filteredItems.length === 0 && !isLoading ? (
+              <p className="empty-text">No cleaned lectures available yet.</p>
+            ) : (
+              filteredItems.map((item) => <GalleryCard key={item.job_id} item={item} />)
+            )}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function GalleryCard({ item }: { item: GalleryItem }) {
+  return (
+    <article className="gallery-card">
+      <div className="gallery-card-header">
+        <h2 className="gallery-title">{item.title}</h2>
+        <span className="helper-text">{formatDateTime(item.created_at)}</span>
+      </div>
+
+      {item.video_url ? <video className="gallery-video" src={buildApiUrl(item.video_url)} controls /> : null}
+
+      <div className="gallery-meta">
+        <span>Job: {item.job_id}</span>
+        <span>Duration: {formatSeconds(item.duration_seconds)}</span>
+        <span>Removed: {formatSeconds(item.total_removed_seconds)}</span>
+      </div>
+
+      <div className="button-row">
+        {item.video_url ? (
+          <a href={buildApiUrl(item.video_url)} className="button button-primary" download>
+            Download
+          </a>
+        ) : null}
+        <Link to={`/jobs/${item.job_id}`} className="button button-secondary">
+          View Details
+        </Link>
+        {item.summary_pdf_url ? (
+          <a href={buildApiUrl(item.summary_pdf_url)} target="_blank" rel="noreferrer" className="button button-secondary">
+            Summary PDF
+          </a>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
 function JobDetailsPage() {
   const { job_id } = useParams();
   const [job, setJob] = useState<JobStatus | null>(null);
   const [artifactAvailability, setArtifactAvailability] = useState<ArtifactAvailability | null>(null);
+  const [processingReport, setProcessingReport] = useState<ProcessingReport | null>(null);
   const [summary, setSummary] = useState<StructuredSummary | null>(null);
   const [summaryPdfAvailable, setSummaryPdfAvailable] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -398,9 +609,14 @@ function JobDetailsPage() {
 
         setJob(jobPayload);
         setArtifactAvailability(artifactPayload);
+        setProcessingReport(await loadProcessingReport(currentJobId, artifactPayload));
         setErrorMessage("");
-        await loadSummary(currentJobId, { silentNotFound: true, setSummary, setSummaryMessage });
-        await checkSummaryPdf(currentJobId, setSummaryPdfAvailable);
+        const summaryExists = await loadSummary(currentJobId, { silentNotFound: true, setSummary, setSummaryMessage });
+        if (summaryExists) {
+          await checkSummaryPdf(currentJobId, setSummaryPdfAvailable);
+        } else {
+          setSummaryPdfAvailable(false);
+        }
       } catch (error) {
         if (!isCancelled) {
           setErrorMessage(error instanceof Error ? error.message : "Failed to load job details.");
@@ -434,6 +650,7 @@ function JobDetailsPage() {
           }
           setJob(jobPayload);
           setArtifactAvailability(artifactPayload);
+          void loadProcessingReport(job.job_id, artifactPayload).then(setProcessingReport);
           setErrorMessage("");
         })
         .catch((error: unknown) => {
@@ -462,12 +679,6 @@ function JobDetailsPage() {
         artifactAvailability?.artifacts.kept_preview
           ? { label: "Kept Preview", href: artifactAvailability.artifacts.kept_preview }
           : null,
-        artifactAvailability?.artifacts.report
-          ? { label: "Report", href: artifactAvailability.artifacts.report }
-          : null,
-        artifactAvailability?.artifacts.segments_csv
-          ? { label: "Segments CSV", href: artifactAvailability.artifacts.segments_csv }
-          : null,
         artifactAvailability?.artifacts.transcript_json
           ? { label: "Transcript Log", href: artifactAvailability.artifacts.transcript_json }
           : null,
@@ -489,8 +700,16 @@ function JobDetailsPage() {
         errorMessage: "Failed to request summary generation.",
       });
 
-      await loadSummary(job_id, { silentNotFound: true, setSummary, setSummaryMessage });
-      await checkSummaryPdf(job_id, setSummaryPdfAvailable);
+      const summaryExists = await loadSummary(job_id, {
+        silentNotFound: true,
+        setSummary,
+        setSummaryMessage,
+      });
+      if (summaryExists) {
+        await checkSummaryPdf(job_id, setSummaryPdfAvailable);
+      } else {
+        setSummaryPdfAvailable(false);
+      }
 
       if (response.status === "not_implemented" && response.message) {
         setSummaryMessage(response.message);
@@ -568,6 +787,8 @@ function JobDetailsPage() {
                 )}
               </div>
 
+              <VerificationChecklist report={processingReport} removedPreviewUrl={artifactAvailability?.artifacts.removed_preview} />
+
               <div>
                 <div className="summary-header">
                   <h2 className="section-title">Summary</h2>
@@ -628,7 +849,13 @@ function NumberField({
   return (
     <label className="field">
       <span className="field-label">{label}</span>
-      <input className="input" type="number" value={value} step={step} onChange={(event) => onChange(event.target.value)} />
+      <input
+        className="input"
+        type="number"
+        value={value}
+        step={step}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </label>
   );
 }
@@ -645,7 +872,12 @@ function TextField({
   return (
     <label className="field">
       <span className="field-label">{label}</span>
-      <input className="input" type="text" value={value} onChange={(event) => onChange(event.target.value)} />
+      <input
+        className="input"
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </label>
   );
 }
@@ -667,12 +899,98 @@ function CheckboxField({
   );
 }
 
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ label: string; value: string }>;
+}) {
+  return (
+    <label className="field">
+      <span className="field-label">{label}</span>
+      <select
+        className="input"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function StatusCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="status-card">
       <div className="status-card-label">{label}</div>
       <div className="status-card-value">{value}</div>
     </div>
+  );
+}
+
+function VerificationChecklist({
+  report,
+  removedPreviewUrl,
+}: {
+  report: ProcessingReport | null;
+  removedPreviewUrl?: string | null;
+}) {
+  if (!report && !removedPreviewUrl) {
+    return null;
+  }
+
+  const removedSegments = report?.removed_segments ?? [];
+  const totalRemoved = removedSegments.reduce((total, segment) => total + Number(segment.duration ?? 0), 0);
+  const videoDuration = Number(report?.duration_seconds ?? 0);
+  const keptSegments = report?.kept_segments ?? [];
+  const speechSegments = report?.speech_segments ?? [];
+  const noSpeechSegments = report?.no_speech_segments ?? [];
+  const outputLabel = report?.output_valid === true ? "Passed" : report?.output_valid === false ? "Failed" : "Pending";
+  const checklistItems = [
+    { label: "Output validation", value: outputLabel },
+    { label: "Video duration", value: videoDuration > 0 ? `${videoDuration.toFixed(2)}s` : "Pending" },
+    { label: "Total removed", value: `${totalRemoved.toFixed(2)}s` },
+    { label: "Kept segments", value: String(keptSegments.length) },
+    { label: "Black", value: String(report?.detections?.black?.length ?? 0) },
+    { label: "Silence", value: String(report?.detections?.silence?.length ?? 0) },
+    { label: "Freeze", value: String(report?.detections?.freeze?.length ?? 0) },
+    { label: "Buffering", value: String(report?.detections?.buffering?.length ?? 0) },
+    { label: "Speech segments", value: String(speechSegments.length) },
+    { label: "No-speech gaps", value: String(noSpeechSegments.length) },
+    { label: "Safety violations", value: String(report?.overlap_violations?.length ?? 0) },
+    { label: "Trimmed segments", value: String(removedSegments.length) },
+  ];
+
+  return (
+    <section className="verification-panel">
+      <h2 className="section-title">Verification Checklist</h2>
+
+      <div className="verification-grid">
+        {checklistItems.map((item) => (
+          <div key={item.label} className="verification-card">
+            <div className="verification-label">{item.label}</div>
+            <div className="verification-value">{item.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {removedPreviewUrl ? (
+        <div className="preview-block">
+          <h3 className="preview-title">Removed Parts Video</h3>
+          <p className="helper-text">Preview of segments removed from the cleaned video.</p>
+          <video className="preview-video" src={buildApiUrl(removedPreviewUrl)} controls />
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -722,6 +1040,23 @@ async function loadJobDetails(currentJobId: string) {
   return { jobPayload, artifactPayload };
 }
 
+async function loadProcessingReport(
+  currentJobId: string,
+  artifactPayload: ArtifactAvailability,
+): Promise<ProcessingReport | null> {
+  if (!artifactPayload.artifacts.report) {
+    return null;
+  }
+
+  try {
+    return await requestJson<ProcessingReport>(`/api/jobs/${currentJobId}/report`, {
+      errorMessage: "Failed to load verification report.",
+    });
+  } catch {
+    return null;
+  }
+}
+
 async function loadSummary(
   currentJobId: string,
   options: {
@@ -729,7 +1064,7 @@ async function loadSummary(
     setSummary: (value: StructuredSummary | null) => void;
     setSummaryMessage: (value: string) => void;
   },
-) {
+): Promise<boolean> {
   const response = await fetch(buildApiUrl(`/api/jobs/${currentJobId}/summary.json`));
 
   if (response.status === 404) {
@@ -737,7 +1072,7 @@ async function loadSummary(
     if (!options.silentNotFound) {
       options.setSummaryMessage("Summary is not available yet.");
     }
-    return;
+    return false;
   }
 
   if (!response.ok) {
@@ -747,6 +1082,7 @@ async function loadSummary(
   const summaryPayload = (await response.json()) as StructuredSummary;
   options.setSummary(summaryPayload);
   options.setSummaryMessage("");
+  return true;
 }
 
 async function checkSummaryPdf(currentJobId: string, setSummaryPdfAvailable: (value: boolean) => void) {
@@ -758,6 +1094,14 @@ async function checkSummaryPdf(currentJobId: string, setSummaryPdfAvailable: (va
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString();
+}
+
+function formatSeconds(value: number | null | undefined) {
+  const seconds = Number(value ?? 0);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return "0.00s";
+  }
+  return `${seconds.toFixed(2)}s`;
 }
 
 function buildApiUrl(path: string) {
