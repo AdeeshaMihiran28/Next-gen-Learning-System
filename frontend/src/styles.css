@@ -51,6 +51,18 @@ select {
   margin-bottom: 1.5rem;
 }
 
+.page-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.page-action {
+  flex: 0 0 auto;
+  text-decoration: none;
+}
+
 .page-title {
   margin: 0;
   font-size: 2rem;
@@ -126,11 +138,24 @@ select {
   gap: 0.9rem 1rem;
 }
 
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem 1rem;
+}
+
 .template-list,
-.log-list,
 .summary-preview {
   display: grid;
   gap: 0.75rem;
+}
+
+.log-list {
+  display: grid;
+  gap: 0.75rem;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 0.35rem;
 }
 
 .template-card {
@@ -157,6 +182,13 @@ select {
   margin: 0;
   color: #475569;
   font-size: 0.95rem;
+}
+
+.selected-file-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .empty-text {
@@ -192,6 +224,24 @@ select {
   background: #ffffff;
   color: #0f172a;
   border-color: #cbd5e1;
+}
+
+.button-danger {
+  padding: 0.55rem 0.8rem;
+  background: #ffffff;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.button-danger:hover {
+  background: #fef2f2;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .status-grid {
@@ -263,6 +313,108 @@ select {
   background: #f8fafc;
 }
 
+.gallery-search-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.gallery-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.gallery-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid #dbe2ea;
+  background: #ffffff;
+}
+
+.gallery-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.gallery-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.gallery-video {
+  width: 100%;
+  max-height: 360px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #000000;
+}
+
+.gallery-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.verification-panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 1px solid #dbe2ea;
+  background: #f8fafc;
+}
+
+.verification-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.verification-card {
+  padding: 0.9rem;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.verification-label {
+  margin-bottom: 0.35rem;
+  color: #475569;
+  font-weight: 600;
+}
+
+.verification-value {
+  color: #0f172a;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.preview-block {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.preview-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.preview-video {
+  width: 100%;
+  max-height: 420px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #000000;
+}
+
 .summary-header {
   display: flex;
   align-items: center;
@@ -312,6 +464,15 @@ select {
     font-size: 1.7rem;
   }
 
+  .page-header-row,
+  .gallery-card-header {
+    flex-direction: column;
+  }
+
+  .gallery-search-row {
+    grid-template-columns: 1fr;
+  }
+
   .summary-header {
     align-items: stretch;
     flex-direction: column;
@@ -325,5 +486,9 @@ select {
   .button,
   .artifact-link {
     width: 100%;
+  }
+
+  .button-row {
+    flex-direction: column;
   }
 }
