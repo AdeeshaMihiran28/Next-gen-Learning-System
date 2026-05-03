@@ -11,6 +11,9 @@ from app.schemas.models import JobStatusResponse, ProcessingOptions, RunResponse
 from app.services.job_lifecycle import create_job_from_upload, queue_job_for_processing
 from app.services.pipeline import run_job_pipeline
 from app.utils.artifacts import existing_artifact_url
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _processing_options_from_form(
@@ -64,6 +67,14 @@ def _processing_options_from_form(
 router = APIRouter()
 
 
+def _run_job_pipeline_safe(job_id: str) -> None:
+    """Run pipeline in background without bubbling exceptions to ASGI layer."""
+    try:
+        run_job_pipeline(job_id)
+    except Exception as exc:
+        logger.exception("Background pipeline failed for job %s: %s", job_id, exc)
+
+
 @router.post("/api/upload", response_model=UploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_video(
     background_tasks: BackgroundTasks,
@@ -82,7 +93,7 @@ async def upload_video(
 
     if auto_start:
         append_job_log(job, "Auto-start enabled; job queued in background")
-        background_tasks.add_task(run_job_pipeline, job.job_id)
+        background_tasks.add_task(_run_job_pipeline_safe, job.job_id)
 
     return UploadResponse(job_id=job.job_id)
 
@@ -111,7 +122,7 @@ async def run_job(
 
     updated_job = queue_job_for_processing(job_id, options=options)
     if updated_job is not None:
-        background_tasks.add_task(run_job_pipeline, job_id)
+        background_tasks.add_task(_run_job_pipeline_safe, job_id)
 
     return RunResponse(job_id=job.job_id, status="queued")
 

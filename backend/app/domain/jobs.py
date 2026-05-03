@@ -80,6 +80,10 @@ class JobStore:
         job.updated_at = _utc_now()
         return job
 
+    @classmethod
+    def delete(cls, job_id: str) -> Job | None:
+        return JOB_STORE.pop(job_id, None)
+
 
 def append_job_log(job: Job, entry: str) -> Job:
     message = entry.strip()

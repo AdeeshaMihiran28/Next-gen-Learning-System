@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import threading
+import time
 from pathlib import Path
+from shutil import rmtree
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.core.config import OUTPUT_DIR
@@ -18,6 +21,7 @@ from app.utils.artifacts import (
 
 
 router = APIRouter()
+PENDING_DELETE_MARKER = ".delete_pending"
 
 
 @router.get("/api/gallery")
@@ -26,6 +30,8 @@ async def list_gallery_items() -> JSONResponse:
 
     for job_dir in sorted(OUTPUT_DIR.iterdir(), key=_path_updated_at, reverse=True):
         if not job_dir.is_dir():
+            continue
+        if (job_dir / PENDING_DELETE_MARKER).exists():
             continue
 
         cleaned_path = job_dir / "cleaned.mp4"
@@ -54,6 +60,24 @@ async def list_gallery_items() -> JSONResponse:
         )
 
     return JSONResponse(content={"items": items})
+
+
+@router.delete("/api/gallery/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_gallery_item(job_id: str) -> Response:
+    job_dir = OUTPUT_DIR / job_id
+    job = JobStore.delete(job_id)
+
+    if not job_dir.is_dir() and job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gallery item not found")
+
+    if job_dir.is_dir():
+        try:
+            rmtree(job_dir)
+        except PermissionError:
+            (job_dir / PENDING_DELETE_MARKER).write_text("delete pending", encoding="utf-8")
+            threading.Thread(target=_retry_delete_directory, args=(job_dir,), daemon=True).start()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/api/jobs/{job_id}/download")
@@ -172,3 +196,14 @@ def _sum_removed_duration(removed_segments: object) -> float:
         if isinstance(segment, dict):
             total += float(segment.get("duration") or 0.0)
     return total
+
+
+def _retry_delete_directory(path: Path, *, attempts: int = 10, delay_seconds: float = 1.0) -> None:
+    for _ in range(attempts):
+        time.sleep(delay_seconds)
+        try:
+            if path.exists():
+                rmtree(path)
+            return
+        except PermissionError:
+            continue
