@@ -16,6 +16,14 @@ function HomePage() {
             gradient: 'from-cyan-500 to-blue-500',
             link: '/quiz',
             stats: { label: 'Active Monitoring', value: '99.9%' }
+        },
+        {
+            icon: '\u{1F4CA}',
+            title: 'MCQ & Diagram Practice',
+            description: 'Practice MCQ questions, upload diagram answers, and receive automated scoring with feedback reports.',
+            gradient: 'from-emerald-500 to-teal-500',
+            link: '/mcq-diagrams',
+            stats: { label: 'Practice Mode', value: 'Ready' }
         }
     ];
 
@@ -51,8 +59,8 @@ function HomePage() {
                         </div>
 
                         <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
-                            Experience the future of education with AI-powered proctoring, voice-controlled lecture recording,
-                            and intelligent attendance tracking - all in one comprehensive platform.
+                            Experience the future of education with AI-powered proctoring, MCQ practice,
+                            diagram-based learning, and lecture video cleaning - all in one comprehensive platform.
                         </p>
 
                         <div className="flex flex-wrap gap-3 justify-center pt-6">
@@ -60,6 +68,11 @@ function HomePage() {
                                 <span className="text-lg sm:text-xl">??</span>
                                 Start Quiz
                                 <span className="group-hover:translate-x-1 transition-transform duration-300">?</span>
+                            </Link>
+                            <Link to="/mcq-diagrams" className="group px-5 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-semibold text-sm sm:text-base shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 hover:scale-105 flex items-center gap-2">
+                                <span className="text-lg sm:text-xl">{'\u{1F4CA}'}</span>
+                                MCQ & Diagrams
+                                <span className="group-hover:translate-x-1 transition-transform duration-300">-&gt;</span>
                             </Link>
                         </div>
 
