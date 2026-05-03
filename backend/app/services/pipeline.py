@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from shutil import copy2
 from pathlib import Path
 from typing import Any
 
@@ -73,6 +74,7 @@ def run_job_pipeline(job_id: str) -> Job:
         "report": str(report_path.name),
         "validation_log": str(validation_log_path.name),
     }
+    used_original_output_fallback = False
 
     try:
         _update_job(job, status="running", progress=5, error_message=None)
@@ -214,11 +216,49 @@ def run_job_pipeline(job_id: str) -> Job:
         confident_removal_segments = add_confidence_to_segments(safe_removal_segments)
         append_job_log(job, f"Assigned confidence to {len(confident_removal_segments)} removal segment(s)")
 
+        # Guardrail: if removals cover almost the whole video, reduce aggressiveness.
+        total_planned_removal = sum(
+            max(0.0, float(segment.get("end", 0.0)) - float(segment.get("start", 0.0)))
+            for segment in confident_removal_segments
+        )
+        if total_duration > 0 and total_planned_removal / total_duration > 0.9:
+            append_job_log(
+                job,
+                "Planned removals exceed 90% of video; dropping silence-only removals to avoid over-trimming",
+            )
+            reduced_segments = [
+                segment
+                for segment in confident_removal_segments
+                if "silence" not in set(segment.get("reasons", []))
+            ]
+            if reduced_segments:
+                confident_removal_segments = reduced_segments
+                append_job_log(
+                    job,
+                    f"After guardrail, {len(confident_removal_segments)} removal segment(s) remain",
+                )
+
         _update_job(job, progress=86)
         append_job_log(job, "Building kept segments")
         good_segments = build_good_segments(confident_removal_segments, total_duration)
         if not good_segments:
-            raise RuntimeError("No kept segments remain after filtering")
+            append_job_log(
+                job,
+                "No kept segments remained after filtering; falling back to full original video segment",
+            )
+            good_segments = [{"start": 0.0, "end": float(total_duration)}]
+            # Reporting should reflect that no cuts were finally applied.
+            confident_removal_segments = []
+            safety_statistics = {
+                "input_segment_count": 0,
+                "safe_segment_count": 0,
+                "violation_count": 0,
+                "original_total_duration": 0.0,
+                "safe_total_duration": 0.0,
+                "trimmed_duration": 0.0,
+            }
+            overlap_violations = []
+            used_original_output_fallback = True
         append_job_log(job, f"Built {len(good_segments)} kept segment(s)")
 
         append_job_log(job, "Writing segments.csv")
@@ -250,7 +290,28 @@ def run_job_pipeline(job_id: str) -> Job:
 
         _update_job(job, progress=94)
         append_job_log(job, "Rendering final cleaned video")
-        render_cleaned_video(job.input_path, good_segments, cleaned_video_path)
+        try:
+            render_cleaned_video(job.input_path, good_segments, cleaned_video_path)
+        except ValueError as exc:
+            if "No renderable segments were produced" not in str(exc):
+                raise
+            append_job_log(
+                job,
+                "Rendered segments were not usable; falling back to original video as cleaned output",
+            )
+            cleaned_video_path.parent.mkdir(parents=True, exist_ok=True)
+            copy2(job.input_path, cleaned_video_path)
+            confident_removal_segments = []
+            safety_statistics = {
+                "input_segment_count": 0,
+                "safe_segment_count": 0,
+                "violation_count": 0,
+                "original_total_duration": 0.0,
+                "safe_total_duration": 0.0,
+                "trimmed_duration": 0.0,
+            }
+            overlap_violations = []
+            used_original_output_fallback = True
 
         _update_job(job, progress=97)
         append_job_log(job, "Validating rendered output")
@@ -278,6 +339,9 @@ def run_job_pipeline(job_id: str) -> Job:
             artifacts=artifacts,
             output_valid=output_is_valid,
         )
+        if used_original_output_fallback:
+            report["status"] = "done_with_fallback"
+            report["fallback_reason"] = "original_video_used_as_cleaned_output"
         _write_json(report_path, report)
 
         final_status = "done" if output_is_valid else "failed"

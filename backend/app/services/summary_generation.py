@@ -99,8 +99,9 @@ def _reduce_summaries_with_fallback(job: Job, chunk_summaries: list[str]) -> str
 
 def _local_chunk_summary(chunk: dict[str, Any]) -> str:
     text = str(chunk.get("text", "")).strip()
+    text = _clean_transcript_text(text)
     sentences = _extract_sentences(text)
-    selected_sentences = sentences[:3]
+    selected_sentences = _select_useful_sentences(sentences, limit=3)
 
     if not selected_sentences and text:
         selected_sentences = [text[:500].strip()]
@@ -108,13 +109,13 @@ def _local_chunk_summary(chunk: dict[str, Any]) -> str:
     start = _format_timestamp(float(chunk.get("start", 0.0)))
     end = _format_timestamp(float(chunk.get("end", 0.0)))
     summary_text = " ".join(selected_sentences).strip()
-    return f"{start} - {end}: {summary_text}"
+    return f"{start} - {end}: {summary_text}" if summary_text else ""
 
 
 def _local_final_summary(chunk_summaries: list[str]) -> str:
-    combined = " ".join(summary.strip() for summary in chunk_summaries if summary.strip())
+    combined = _clean_transcript_text(" ".join(summary.strip() for summary in chunk_summaries if summary.strip()))
     sentences = _extract_sentences(combined)
-    selected_sentences = sentences[:8]
+    selected_sentences = _select_useful_sentences(sentences, limit=5)
 
     if selected_sentences:
         return " ".join(selected_sentences)
@@ -129,25 +130,21 @@ def build_structured_summary(
     final_summary: str,
 ) -> dict[str, Any]:
     """Build a structured summary payload from generated chunk summaries."""
-    overview = final_summary.strip()
+    overview = _clean_transcript_text(final_summary).strip()
     summary_sentences = _extract_sentences(overview)
-    topic_candidates = _dedupe_preserve_order(
-        summary_sentences + [summary.strip() for summary in chunk_summaries if summary.strip()]
-    )
+    topic_candidates = _build_key_topics(overview, chunk_summaries)
+    takeaways = _build_takeaways(summary_sentences, topic_candidates)
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "overview": overview,
         "key_topics": topic_candidates[:5],
         "definitions": _extract_definitions(overview)[:5],
-        "takeaways": summary_sentences[:5] or topic_candidates[:3],
+        "takeaways": takeaways[:5],
         "outline": [
-            {
-                "time_range": f"{_format_timestamp(float(chunk.get('start', 0.0)))} - {_format_timestamp(float(chunk.get('end', 0.0)))}",
-                "summary": chunk_summary.strip(),
-            }
+            _strip_time_prefix(_clean_transcript_text(chunk_summary)).strip()
             for chunk, chunk_summary in zip(transcript_chunks, chunk_summaries, strict=False)
-            if chunk_summary.strip()
+            if _strip_time_prefix(_clean_transcript_text(chunk_summary)).strip()
         ],
     }
 def _write_summary_json(output_path: Path, payload: dict[str, Any]) -> Path:
@@ -168,6 +165,8 @@ def _extract_definitions(text: str) -> list[dict[str, str]]:
     definitions: list[dict[str, str]] = []
 
     for sentence in _extract_sentences(text):
+        if _is_low_value_sentence(sentence):
+            continue
         match = re.match(
             r"(?P<term>[A-Z][A-Za-z0-9\s/-]{1,40})\s+(?:is|are|refers to|means)\s+(?P<definition>.+)",
             sentence,
@@ -175,10 +174,15 @@ def _extract_definitions(text: str) -> list[dict[str, str]]:
         if match is None:
             continue
 
+        term = match.group("term").strip()
+        definition = match.group("definition").strip()
+        if len(term.split()) > 4 or len(definition.split()) < 4:
+            continue
+
         definitions.append(
             {
-                "term": match.group("term").strip(),
-                "definition": match.group("definition").strip(),
+                "term": term,
+                "definition": definition,
             }
         )
 
@@ -210,3 +214,49 @@ def _format_timestamp(seconds: float) -> str:
     if hours:
         return f"{hours:02d}:{remaining_minutes:02d}:{remaining_seconds:02d}"
     return f"{remaining_minutes:02d}:{remaining_seconds:02d}"
+
+
+def _clean_transcript_text(text: str) -> str:
+    cleaned = re.sub(r"\b(\w+)(?:\s+\1\b){2,}", r"\1", text, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(you|um|uh|okay|ok)\b(?:\s+\b\1\b)+", r"\1", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _strip_time_prefix(text: str) -> str:
+    return re.sub(r"^\d{2}:\d{2}(?::\d{2})?\s*-\s*\d{2}:\d{2}(?::\d{2})?:\s*", "", text).strip()
+
+
+def _is_low_value_sentence(sentence: str) -> bool:
+    normalized = sentence.strip().casefold()
+    if len(normalized.split()) < 5:
+        return True
+    low_value_phrases = {
+        "i have flashed my screen",
+        "okay",
+    }
+    return normalized in low_value_phrases
+
+
+def _select_useful_sentences(sentences: list[str], *, limit: int) -> list[str]:
+    useful = [
+        sentence
+        for sentence in sentences
+        if not _is_low_value_sentence(sentence)
+    ]
+    return useful[:limit]
+
+
+def _build_key_topics(overview: str, chunk_summaries: list[str]) -> list[str]:
+    source_sentences = _extract_sentences(
+        " ".join([overview, *(_strip_time_prefix(summary) for summary in chunk_summaries)])
+    )
+    candidates = _select_useful_sentences(source_sentences, limit=8)
+    return _dedupe_preserve_order(candidates)
+
+
+def _build_takeaways(summary_sentences: list[str], topic_candidates: list[str]) -> list[str]:
+    candidates = _select_useful_sentences(summary_sentences, limit=5)
+    if candidates:
+        return candidates
+    return topic_candidates[:3]

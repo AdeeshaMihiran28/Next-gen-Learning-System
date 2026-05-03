@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from shutil import copy2
 from shutil import rmtree
 from pathlib import Path
 from typing import Any
 
-from app.services.ffmpeg import run_ffmpeg_command
+from app.services.ffmpeg import get_video_duration, run_ffmpeg_command
 
 
 def render_cleaned_video(
@@ -50,21 +51,34 @@ def _render_segments(
     concat_file = temp_dir / f"{stem}.concat.txt"
 
     part_paths: list[Path] = []
+    MIN_RENDERABLE_DURATION_SECONDS = 0.05
 
     try:
         for index, segment in enumerate(segments):
             start = float(segment["start"])
             end = float(segment["end"])
             duration = max(0.0, end - start)
-            if duration <= 0:
+            if duration < MIN_RENDERABLE_DURATION_SECONDS:
                 continue
 
             part_path = temp_dir / f"{stem}_{index:04d}.mp4"
             _render_segment_clip(input_path, start, duration, part_path)
+            # Skip invalid tiny clips that ffmpeg may produce with no streams.
+            if not part_path.exists() or part_path.stat().st_size <= 0:
+                continue
+            try:
+                if get_video_duration(part_path) < MIN_RENDERABLE_DURATION_SECONDS:
+                    continue
+            except Exception:
+                continue
             part_paths.append(part_path)
 
         if not part_paths:
-            raise ValueError("No renderable segments were produced")
+            raise ValueError("No renderable segments were produced after filtering")
+
+        if len(part_paths) == 1:
+            copy2(part_paths[0], output_path)
+            return output_path
 
         concat_file.write_text(
             "\n".join(f"file '{part_path.resolve().as_posix()}'" for part_path in part_paths) + "\n",

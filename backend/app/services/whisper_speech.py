@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 from app.services.ffmpeg import run_ffmpeg_command
 
 DEFAULT_WHISPER_MODEL = "base"
+logger = logging.getLogger(__name__)
 
 
 def extract_audio_to_wav(video_path: Path, wav_path: Path) -> Path:
@@ -44,17 +46,29 @@ def transcribe_wav_with_whisper(
     language: str | None = "en",
 ) -> tuple[str, list[dict[str, Any]]]:
     """Transcribe a WAV file with local Whisper and persist transcript.json."""
+    def _write_empty_transcript(reason: str) -> tuple[str, list[dict[str, Any]]]:
+        payload = {
+            "text": "",
+            "segments": [],
+            "warning": reason,
+        }
+        transcript_path.parent.mkdir(parents=True, exist_ok=True)
+        transcript_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return "", []
+
     try:
         import whisper
-    except ImportError as exc:
-        raise RuntimeError(
-            "OpenAI Whisper is not installed. Install the 'openai-whisper' package to enable transcription."
-        ) from exc
+    except Exception as exc:
+        logger.warning("Whisper import failed; continuing without transcription: %s", exc)
+        return _write_empty_transcript(f"Whisper import failed: {exc}")
 
     if not hasattr(whisper, "load_model"):
-        raise RuntimeError(
-            "The installed 'whisper' module is not OpenAI Whisper. Install 'openai-whisper' and remove the unrelated 'whisper' package."
+        warning = (
+            "Installed 'whisper' module is not OpenAI Whisper. "
+            "Install 'openai-whisper' and remove unrelated 'whisper' package."
         )
+        logger.warning(warning)
+        return _write_empty_transcript(warning)
 
     selected_model = _normalize_model_name(model_name)
     selected_language = _normalize_language(language)
@@ -68,7 +82,8 @@ def transcribe_wav_with_whisper(
             fp16=False,
         )
     except Exception as exc:
-        raise RuntimeError(f"Whisper transcription failed using model '{selected_model}': {exc}") from exc
+        logger.warning("Whisper transcription failed; continuing without transcript: %s", exc)
+        return _write_empty_transcript(f"Whisper transcription failed ({selected_model}): {exc}")
 
     transcript_text = (result.get("text") or "").strip()
     speech_segments = _normalize_speech_segments(result.get("segments", []))
