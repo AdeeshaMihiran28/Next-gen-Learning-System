@@ -122,11 +122,15 @@ def _ensure_loaded() -> None:  # A function to ensure that the MCQ dataset and d
         df = df[(df[question_col] != "") & (df[correct_col] != "")].reset_index(drop=True)
         df["qid"] = df.index.astype(int)
 
-        option_cols = []   # Identify option columns as those that are of object type and are not the question column, correct answer column, or qid. This allows for flexibility in the CSV format, where option columns can be named differently as long as they are not the same as the question or correct answer columns.
+        option_cols = []   # Identify option columns without relying on pandas dtype names.
         for c in df.columns:
             if c in {question_col, correct_col, "qid"}:
                 continue
-            if str(df[c].dtype) == "object":
+            name = str(c).strip().lower()
+            if name in {"label"} or name.startswith("unnamed"):
+                continue
+            non_empty = df[c].fillna("").astype(str).str.strip().ne("").any()
+            if non_empty and (name.startswith("option") or name.startswith("choice") or name.startswith("answer")):
                 option_cols.append(c)
         if not option_cols:
             raise RuntimeError("No MCQ option columns found")
