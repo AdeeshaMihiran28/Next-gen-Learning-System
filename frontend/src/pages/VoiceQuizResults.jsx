@@ -19,6 +19,32 @@ function pct(part, total) {
   return Math.round((part / total) * 100);
 }
 
+function normalizeVoiceLabel(label) {
+  const value = String(label || "").trim().toLowerCase();
+  if (value === "confident") return "Confident";
+  if (value === "hesitant") return "Hesitant";
+  if (value === "nervous") return "Nervous";
+  return "";
+}
+
+function labelFromVoiceConfidence(voiceConfidence) {
+  const direct = normalizeVoiceLabel(
+    voiceConfidence?.predicted_label || voiceConfidence?.label
+  );
+  if (direct) return direct;
+
+  const probabilities = voiceConfidence?.probabilities || {};
+  let best = { label: "", value: -1 };
+  for (const [rawLabel, rawValue] of Object.entries(probabilities)) {
+    const label = normalizeVoiceLabel(rawLabel);
+    const value = safeNum(rawValue, -1);
+    if (label && value > best.value) {
+      best = { label, value };
+    }
+  }
+  return best.label;
+}
+
 // Format a date/time string for display, with fallback to current local time.
 function fmtDateTime(dt) {
   try {
@@ -106,18 +132,21 @@ function addWrappedText(pdf, text, x, y, maxWidth, lineHeight = 5) {
 
 export default function VoiceQuizResults() {
   const { state } = useLocation();
+  const [savedResult, setSavedResult] = useState(null);
+  const result = savedResult || state || {};
 
   // Load quiz result state passed through navigation
-  const answers = state?.answers || [];
   const sessionId = state?.sessionId || state?.session_id || "";
+  const answers = result?.answers || [];
   const submittedAt =
-    state?.submitted_at || state?.submittedAt || new Date().toISOString();
+    result?.submitted_at || result?.submittedAt || new Date().toISOString();
 
-  const totalMarks = safeNum(state?.total_marks ?? state?.totalMarks ?? 0, 0);
+  const totalMarks = safeNum(result?.total_marks ?? result?.totalMarks ?? 0, 0);
 
   // from backend submit response
-  const topicReport = state?.topic_report || null;
-  const feedback = state?.feedback || null;
+  const voicePattern = result?.voice_pattern || null;
+  const topicReport = result?.topic_report || null;
+  const feedback = result?.feedback || null;
 
   const worstTopic = topicReport?.worst_topic || "N/A";
   const bestTopic = topicReport?.best_topic || "N/A";
@@ -140,13 +169,25 @@ export default function VoiceQuizResults() {
   useEffect(() => {
     (async () => {
       try {
-        const u = await apiFetch("/api/auth/me");
+        const u = await apiFetch("/auth/me");
         setMe(u?.user || null);
       } catch {
         setMe(null);
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    (async () => {
+      try {
+        const data = await apiFetch(`/api/quiz/session/${sessionId}`);
+        setSavedResult(data);
+      } catch (e) {
+        console.warn("Could not reload saved quiz session", e);
+      }
+    })();
+  }, [sessionId]);
 
   const totalQ = answers.length;
   const maxMarks = totalQ * 10;
@@ -178,13 +219,25 @@ export default function VoiceQuizResults() {
 
   // Voice confidence distribution (ignore NO_SPEECH)
   const voiceCounts = useMemo(() => {
+    const fromBackend = {};
+    for (const item of voicePattern?.labels || []) {
+      const label = normalizeVoiceLabel(item?.label);
+      if (!label) continue;
+      fromBackend[label] = safeNum(item?.count, 0);
+    }
+    if (Object.keys(fromBackend).length > 0) {
+      return fromBackend;
+    }
+
     return answers.reduce((acc, a) => {
-      const label = String(a?.voice_confidence?.predicted_label || "N/A");
-      if (!label || label === "NO_SPEECH" || label === "N/A") return acc;
+      const label =
+        labelFromVoiceConfidence(a?.voice_confidence) ||
+        normalizeVoiceLabel(a?.voice_label);
+      if (!label) return acc;
       acc[label] = (acc[label] || 0) + 1;
       return acc;
     }, {});
-  }, [answers]);
+  }, [answers, voicePattern]);
 
   const voiceTotal = useMemo(() => {
     return Object.values(voiceCounts).reduce((s, v) => s + v, 0);
@@ -199,10 +252,57 @@ export default function VoiceQuizResults() {
     return top;
   }, [voiceCounts]);
 
+  const resolveAnswerVoiceLabel = (answer) => {
+    return (
+      labelFromVoiceConfidence(answer?.voice_confidence) ||
+      normalizeVoiceLabel(answer?.voice_label) ||
+      "Unclassified"
+    );
+  };
+
   // Sort voice entries by count for display.
   const voiceEntriesSorted = useMemo(() => {
-    return Object.entries(voiceCounts).sort((a, b) => b[1] - a[1]);
+    const order = ["Confident", "Hesitant", "Nervous"];
+    return order.map((label) => [label, voiceCounts[label] || 0]);
   }, [voiceCounts]);
+
+  const bestTopicAnswers = useMemo(() => {
+    if (!bestTopic || bestTopic === "N/A") return [];
+    return answers.filter((a) => String(a?.topic || "").trim() === bestTopic);
+  }, [answers, bestTopic]);
+
+  const bestTopicStats = useMemo(() => {
+    const total = bestTopicAnswers.length;
+    const marks = bestTopicAnswers.reduce((sum, a) => sum + safeNum(a?.grade?.marks, 0), 0);
+    const max = total * 10;
+    const strong = bestTopicAnswers.filter((a) => ["GOOD", "PARTIAL"].includes(String(a?.grade?.level || "").toUpperCase())).length;
+    return {
+      total,
+      marks,
+      max,
+      percent: max ? Math.round((marks / max) * 100) : 0,
+      strong,
+    };
+  }, [bestTopicAnswers]);
+
+  const strengthTips = useMemo(() => {
+    if (!bestTopic || bestTopic === "N/A") {
+      return ["Complete more answers to identify a reliable strength area."];
+    }
+    return [
+      `Keep revising ${bestTopic} with short definition-first answers.`,
+      "Use one clear example after each definition to protect marks.",
+      "Maintain this topic while spending extra practice time on the weakest topic.",
+    ];
+  }, [bestTopic]);
+
+  const hasReliableStrength = bestTopicStats.strong > 0 && bestTopic && bestTopic !== "N/A";
+  const strengthTopicLabel = hasReliableStrength ? bestTopic : "Not identified";
+  const strengthFeedbackText =
+    bestFeedback ||
+    (hasReliableStrength
+      ? `Your strongest topic is ${bestTopic}. Keep practicing this area while improving your weaker topics.`
+      : "No reliable strength identified yet. Get at least one GOOD or PARTIAL answer in a topic to unlock a best-topic strength.");
 
   // ✅ Off-screen report root
   const reportRootRef = useRef(null);
@@ -597,7 +697,7 @@ async function downloadReport() {
       const tagTexts = [
         `Topic: ${a?.topic || "UNKNOWN"}`,
         `Marks: ${a?.grade?.marks ?? 0} (${a?.grade?.level ?? "N/A"})`,
-        `Voice: ${a?.voice_confidence?.predicted_label || "N/A"}`,
+        `Voice: ${resolveAnswerVoiceLabel(a)}`,
       ];
       const tagTotalW = tagTexts.reduce((s, t) => s + pdf.getTextWidth(t) + 11, 0);
       const tagRowH = tagTotalW > contentW - 10 ? 16 : 10;
@@ -641,7 +741,7 @@ async function downloadReport() {
         [235, 245, 255], [200, 225, 245], [0, 90, 140]
       );
       placeTag(
-        `Voice: ${a?.voice_confidence?.predicted_label || "N/A"}`,
+        `Voice: ${resolveAnswerVoiceLabel(a)}`,
         [245, 240, 255], [225, 220, 245], [80, 60, 140]
       );
 
@@ -711,8 +811,9 @@ async function downloadReport() {
 
    // Text prepared for speaking the best feedback card.
   const bestSpeakText = useMemo(() => {
-    return `Best topic is ${bestTopic}. Strength feedback: ${bestFeedback}`;
-  }, [bestTopic, bestFeedback]);
+    const tips = strengthTips.map((t) => `Tip: ${t}`).join(". ");
+    return `Best topic is ${strengthTopicLabel}. Score ${bestTopicStats.marks} out of ${bestTopicStats.max}. Strength feedback: ${strengthFeedbackText}. ${tips}`;
+  }, [strengthTopicLabel, strengthFeedbackText, bestTopicStats, strengthTips]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#d9f3ff_0%,#f6fbff_42%,#f8fafc_100%)] dark:bg-[radial-gradient(circle_at_top,#072137_0%,#08131f_45%,#020617_100%)] p-4 sm:p-6">
@@ -832,7 +933,7 @@ async function downloadReport() {
             )}
 
             {/* Best Topic */}
-            {bestFeedback && (
+            {(mainFeedback || bestFeedback) && (
               <div className="p-5 rounded-2xl border border-emerald-200/80 dark:border-emerald-400/25 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/15">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="font-bold text-gray-900 dark:text-white">
@@ -841,7 +942,7 @@ async function downloadReport() {
 
                   <div className="flex items-center gap-2">
                     <span className="px-3 py-1 rounded-full bg-white/85 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100">
-                      {bestTopic}
+                      {strengthTopicLabel}
                     </span>
 
                     {/* ✅ PLAY / STOP button */}
@@ -876,8 +977,23 @@ async function downloadReport() {
                   </div>
                 </div>
 
+                <div className="mt-3 text-sm text-slate-700 dark:text-slate-200">
+                  <b>Voice Pattern:</b> {overallVoice}
+                </div>
+
+                <div className="mt-3 p-3 rounded-xl bg-white/75 dark:bg-slate-900/35 border border-slate-200/80 dark:border-slate-700/60">
+                  <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                    Strength Building Tips
+                  </div>
+                  <ul className="mt-2 list-disc pl-5 text-xs text-slate-700 dark:text-slate-200 space-y-1">
+                    {strengthTips.slice(0, 3).map((t, idx) => (
+                      <li key={idx}>{t}</li>
+                    ))}
+                  </ul>
+                </div>
+
                 <div className="mt-3 text-sm text-slate-800 dark:text-slate-100 leading-relaxed">
-                  {bestFeedback}
+                  {strengthFeedbackText}
                 </div>
               </div>
             )}
@@ -935,7 +1051,7 @@ async function downloadReport() {
         </div>
 
         {/* ✅ Voice Pattern Report */}
-        <div className="mt-6 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-slate-900 to-slate-800 shadow-xl">
+        <div className="mt-6 p-5 rounded-2xl border border-slate-700/80 bg-slate-900/70 shadow-xl">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <div className="text-lg font-bold text-white">Voice Pattern Report</div>
@@ -959,22 +1075,22 @@ async function downloadReport() {
             </div>
           </div>
 
-          <div className="mt-4 grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {voiceEntriesSorted.length === 0 ? (
-              <div className="text-sm text-slate-300">
-                No voice confidence labels available.
-              </div>
-            ) : (
-              voiceEntriesSorted.map(([label, count]) => (
+          {voiceEntriesSorted.length === 0 ? (
+            <div className="mt-4 text-sm text-slate-300">
+              No voice confidence labels available.
+            </div>
+          ) : (
+            <div className="mt-4 grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {voiceEntriesSorted.map(([label, count]) => (
                 <div
                   key={label}
-                  className="p-4 rounded-xl bg-white/5 border border-white/10"
+                  className="p-4 rounded-xl bg-slate-800/75 border border-slate-700/80"
                 >
                   <div className="flex items-center justify-between text-sm text-slate-200">
-                    <span>{label}</span>
-                    <span>{count}</span>
+                    <span className="font-semibold">{label}</span>
+                    <span className="font-bold">{count}</span>
                   </div>
-                  <div className="mt-2 h-2 rounded-full bg-white/10 overflow-hidden">
+                  <div className="mt-3 h-2 rounded-full bg-slate-700 overflow-hidden">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"
                       style={{ width: `${pct(count, voiceTotal)}%` }}
@@ -984,9 +1100,9 @@ async function downloadReport() {
                     {pct(count, voiceTotal)}%
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ✅ Topic Performance Table */}
@@ -1065,7 +1181,7 @@ async function downloadReport() {
                     Marks: {a.grade?.marks ?? 0} ({a.grade?.level ?? "N/A"})
                   </span>
                   <span className="px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700/40 text-xs font-bold text-indigo-700 dark:text-indigo-200">
-                    Voice: {a.voice_confidence?.predicted_label || "N/A"}
+                    Voice: {resolveAnswerVoiceLabel(a)}
                   </span>
                 </div>
               </div>

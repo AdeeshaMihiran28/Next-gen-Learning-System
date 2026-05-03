@@ -1,4 +1,4 @@
-
+﻿
 
 
 import { useEffect, useRef, useState } from "react";
@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { BASE_URL, apiFetch } from "../utils/api";
 
 // Total quiz duration: 13 minutes expressed in milliseconds.
-const QUIZ_DURATION_MS = 13 * 60 * 1000; // ✅ 13 minutes
+const QUIZ_DURATION_MS = 13 * 60 * 1000; // 13 minutes
 
 // Local storage key used to save draft quiz progress.
 const DRAFT_KEY = "voice_quiz_draft_v1";
@@ -48,12 +48,12 @@ export default function VoiceQuizPage() {
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [ttsErr, setTtsErr] = useState("");
 
-  // ✅ TIMER STATE (persisted)
+  // TIMER STATE (persisted)
   const [remainingMs, setRemainingMs] = useState(QUIZ_DURATION_MS);
   const [paused, setPaused] = useState(false);
   const [timeUp, setTimeUp] = useState(false);
 
-  // ✅ NEW: timer starts only after first answer is saved
+  // NEW: timer starts only after first answer is saved
   const [timerStarted, setTimerStarted] = useState(false);
 
   // Prevent duplicate auto-submit when time expires.
@@ -73,7 +73,7 @@ export default function VoiceQuizPage() {
         paused,
         timeUp,
         autoSpeak,
-        timerStarted, // ✅ persist
+        timerStarted, // persist
         ...next,
       };
       localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
@@ -86,7 +86,7 @@ export default function VoiceQuizPage() {
     } catch {}
   }
 
-  // ✅ Auto-submit (used when timer hits 0)
+  // Auto-submit (used when timer hits 0)
   async function submitAll(auto = false) {
     setErr("");
     try {
@@ -105,8 +105,11 @@ export default function VoiceQuizPage() {
           questions,
           answers: r?.answers || answers,
           total_marks: r.total_marks,
+          report_summary: r.report_summary,
+          voice_pattern: r.voice_pattern,
           topic_report: r.topic_report,
           feedback: r.feedback,
+          topic_insights: r.topic_insights,
           submitted_at: r.submitted_at || new Date().toISOString(),
           auto_submitted: auto,
         },
@@ -116,12 +119,12 @@ export default function VoiceQuizPage() {
     }
   }
 
-  // ✅ Load draft first (refresh-resume)
+  // Load draft first (refresh-resume)
   useEffect(() => {
     (async () => {
       try {
         setErr("");
-        await apiFetch("/api/auth/me");// validate user session
+        await apiFetch("/auth/me");// validate user session
 
         let draft = null;
         try {
@@ -130,7 +133,7 @@ export default function VoiceQuizPage() {
           draft = null;
         }
 
-        // ✅ Resume draft (supports version 1 or 2)
+        // Resume draft (supports version 1 or 2)
         const draftOk =
           (draft?.version === 1 || draft?.version === 2) &&
           Array.isArray(draft.questions) &&
@@ -150,7 +153,7 @@ export default function VoiceQuizPage() {
           setTimeUp(!!draft.timeUp);
           setAutoSpeak(!!draft.autoSpeak);
 
-          // ✅ if old draft (v1) -> timerStarted = true (since old system started immediately)
+          // if old draft (v1) -> timerStarted = true (since old system started immediately)
           if (draft.version === 1) {
             setTimerStarted(true);
           } else {
@@ -219,7 +222,7 @@ export default function VoiceQuizPage() {
         });
         setSessionId(s.session_id);
 
-        // ✅ timer NOT started until first answer
+        // timer NOT started until first answer
         setRemainingMs(QUIZ_DURATION_MS);
         setTimerStarted(false);
 
@@ -235,7 +238,7 @@ export default function VoiceQuizPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ Save draft whenever important state changes
+  // Save draft whenever important state changes
   useEffect(() => {
     if (loading) return;
     if (!questions?.length) return;
@@ -254,7 +257,7 @@ export default function VoiceQuizPage() {
     timerStarted,
   ]);
 
-  // ✅ Auto pause/resume on tab + window focus (NO buttons)
+  // Auto pause/resume on tab + window focus (NO buttons)
   useEffect(() => {
     function onVis() {
       if (document.hidden) setPaused(true);
@@ -279,10 +282,10 @@ export default function VoiceQuizPage() {
   }, [timeUp]);
 
 
-  // ✅ Countdown tick (ONLY if timerStarted)
+  // Countdown tick (ONLY if timerStarted)
   useEffect(() => {
     if (loading) return;
-    if (!timerStarted) return; // ✅ WAIT until first answer
+    if (!timerStarted) return; // WAIT until first answer
     if (paused) return;
     if (timeUp) return;
 
@@ -297,11 +300,11 @@ export default function VoiceQuizPage() {
     return () => clearInterval(t);
   }, [loading, timerStarted, paused, timeUp]);
 
-  // ✅ When hits 0 => timeUp + auto submit
+  // When hits 0 => timeUp + auto submit
   useEffect(() => {
     if (loading) return;
     if (timeUp) return;
-    if (!timerStarted) return; // ✅ only if started
+    if (!timerStarted) return; // only if started
 
     if (remainingMs <= 0) {
       setTimeUp(true);
@@ -329,7 +332,7 @@ export default function VoiceQuizPage() {
 
   const doneCount = answers.filter(Boolean).length;
 
-  // ✅ Submit active if ALL done OR timeUp (with at least 1 answer) + session exists
+  // Submit active if ALL done OR timeUp (with at least 1 answer) + session exists
   const canSubmit =
     (!!sessionId && doneCount === questions.length) ||
     (!!sessionId && timeUp && doneCount > 0);
@@ -339,9 +342,9 @@ export default function VoiceQuizPage() {
     : recording
     ? "AI Status: Listening..."
     : timeUp
-    ? "AI Status: Time Over ⏰"
+    ? "AI Status: Time Over"
     : isLocked
-    ? "AI Status: Answer Saved ✅"
+    ? "AI Status: Answer Saved"
     : "AI Status: Ready";
   
   // Speak the current question via browser TTS.
@@ -388,7 +391,7 @@ export default function VoiceQuizPage() {
   async function startRecording() {
     if (isLocked) return;
     if (timeUp) {
-      setErr("Time is over ⏰ You can only submit completed answers now.");
+      setErr("Time is over. You can only submit completed answers now.");
       return;
     }
     setErr("");
@@ -418,7 +421,7 @@ export default function VoiceQuizPage() {
   async function stopRecordingAndGrade() {
     if (!mediaRecorderRef.current || isLocked) return;
     if (timeUp) {
-      setErr("Time is over ⏰ You can only submit completed answers now.");
+      setErr("Time is over. You can only submit completed answers now.");
       return;
     }
 
@@ -454,12 +457,16 @@ export default function VoiceQuizPage() {
       if (!res.ok) throw new Error(data?.error || "Voice grading failed");
 
       const vcLabel = data?.voice_confidence?.predicted_label;
+      const normalizedVoiceLabel = ["Confident", "Hesitant", "Nervous"].includes(vcLabel)
+        ? vcLabel
+        : "";
       if (
         vcLabel === "NO_SPEECH" ||
+        !normalizedVoiceLabel ||
         !data?.transcript ||
         data?.transcript.trim() === ""
       ) {
-        setErr("No voice detected 😕 Please speak clearly and try again.");
+        setErr("Voice pattern was not classified. Please speak clearly and try again.");
         return;
       }
 
@@ -474,14 +481,14 @@ export default function VoiceQuizPage() {
         voice_confidence: data.voice_confidence,
       };
 
-      // ✅ Save answer
+      // Save answer
       setAnswers((prev) => {
         const next = [...prev];
         next[idx] = item;
         return next;
       });
 
-      // ✅ START TIMER only when first answer is saved
+      // START TIMER only when first answer is saved
       if (!timerStarted) {
         setTimerStarted(true);
         setPaused(false);
@@ -599,7 +606,7 @@ export default function VoiceQuizPage() {
             </div>
 
             <div className="statusPill" title="Time Remaining" style={{ marginTop: -8 }}>
-              ⏳ Time: <span className="text-white">{fmt(remainingMs)}</span>
+              Time: <span className="text-white">{fmt(remainingMs)}</span>
               {!timerStarted && !timeUp ? " (Waiting...)" : ""}
               {paused && timerStarted && !timeUp ? " (Paused)" : ""}
             </div>
@@ -607,7 +614,7 @@ export default function VoiceQuizPage() {
 
           <div className="relative mt-10 text-center">
             <div className="flex items-center justify-between text-slate-200/90 text-sm">
-              <div className="font-bold">🎤 Voice Quiz ({idx + 1}/{questions.length})</div>
+              <div className="font-bold">Voice Quiz ({idx + 1}/{questions.length})</div>
               <div>
                 Answered: <b className="text-white">{doneCount}</b> / {questions.length}
               </div>
@@ -633,15 +640,15 @@ export default function VoiceQuizPage() {
             <div className="mt-4">
               {timeUp ? (
                 <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-400/15 text-red-100 border border-red-300/20 text-sm font-bold">
-                  ⏰ Time Over (auto-submitted)
+                  Time Over (auto-submitted)
                 </span>
               ) : isLocked ? (
                 <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-400/15 text-emerald-100 border border-emerald-300/20 text-sm font-bold">
-                  ✅ Answer saved (locked)
+                  Answer saved (locked)
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-400/15 text-yellow-100 border border-yellow-300/20 text-sm font-bold">
-                  ⏳ Not answered yet
+                  Not answered yet
                 </span>
               )}
             </div>
@@ -665,9 +672,9 @@ export default function VoiceQuizPage() {
                 : !timerStarted
                 ? "Timer will start after you submit your first answer."
                 : recording
-                ? "Listening… Speak clearly."
+                ? "Listening... Speak clearly."
                 : processing
-                ? "Analyzing your answer…"
+                ? "Analyzing your answer..."
                 : isLocked
                 ? "Answer saved. You can move to next question."
                 : "Press Start Recording to answer."}
@@ -694,7 +701,7 @@ export default function VoiceQuizPage() {
               disabled={processing}
               className="px-5 py-3 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-60"
             >
-              🔊 Speak Question
+              Speak Question
             </button>
 
             <button
@@ -702,7 +709,7 @@ export default function VoiceQuizPage() {
               disabled={processing}
               className="px-5 py-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100 font-semibold disabled:opacity-60"
             >
-              🛑 Stop
+              Stop
             </button>
 
             <label className="flex items-center gap-2 px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600">
@@ -720,7 +727,7 @@ export default function VoiceQuizPage() {
                 disabled={processing || isLocked || timeUp}
                 className="px-5 py-3 rounded-xl bg-purple-600 text-white font-semibold disabled:opacity-60"
               >
-                🎙️ Start Recording
+                Start Recording
               </button>
             ) : (
               <button
@@ -728,7 +735,7 @@ export default function VoiceQuizPage() {
                 disabled={processing || isLocked || timeUp}
                 className="px-5 py-3 rounded-xl bg-red-600 text-white font-semibold disabled:opacity-60"
               >
-                ⏹ Stop & Check
+                Stop & Check
               </button>
             )}
 
@@ -737,7 +744,7 @@ export default function VoiceQuizPage() {
               disabled={idx === 0 || processing}
               className="px-5 py-3 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold disabled:opacity-60"
             >
-              ← Previous
+              Previous
             </button>
 
             <button
@@ -745,7 +752,7 @@ export default function VoiceQuizPage() {
               disabled={idx === questions.length - 1 || processing}
               className="px-5 py-3 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold disabled:opacity-60"
             >
-              Next →
+              Next
             </button>
 
             <button
@@ -753,7 +760,7 @@ export default function VoiceQuizPage() {
               disabled={!canSubmit || processing}
               className="ml-auto px-5 py-3 rounded-xl bg-cyan-600 text-white font-bold disabled:opacity-60"
             >
-              ✅ Submit All
+              Submit All
             </button>
           </div>
         </div>

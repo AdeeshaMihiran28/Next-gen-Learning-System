@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+﻿import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import ThemeToggle from './ThemeToggle';
 
@@ -29,14 +29,18 @@ function Header() {
     };
 
     const adminLinks = [
-        { path: '/home', label: 'Home', icon: '??' },
-        { path: '/analysis', label: 'Exam Analysis', icon: '??' }
+        { path: '/home', label: 'Home', icon: '\u{1F3E0}' },
+        { path: '/analysis', label: 'Exam Analysis', icon: '\u{1F4C8}' },
+        { path: '/video-cleaner', label: 'Video Cleaner', icon: '\u{1F3AC}' }
     ];
 
     const studentLinks = [
-        { path: '/home', label: 'Home', icon: '??' },
-        { path: '/quiz', label: 'Quiz System', icon: '??' },
-        { path: '/student', label: 'My Dashboard', icon: '??' }
+        { path: '/home', label: 'Home', icon: '\u{1F3E0}' },
+        { path: '/quiz', label: 'Quiz System', icon: '\u{1F4DD}' },
+        { path: '/mcq-diagrams', label: 'MCQ & Diagrams', icon: '\u{1F4CA}' },
+        { path: '/voice-quiz', label: 'Voice Answer', icon: '\u{1F399}\uFE0F' },
+        { path: '/student', label: 'My Dashboard', icon: '\u{1F64B}' },
+        { path: '/video-cleaner', label: 'Video Cleaner', icon: '\u{1F3AC}' }
     ];
 
     const isHomePage = location.pathname === '/' || location.pathname === '/home';
@@ -44,12 +48,14 @@ function Header() {
         ? adminLinks
         : (isHomePage ? studentLinks.filter((link) => link.path === '/home') : studentLinks);
 
+    const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
+
     return (
         <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 backdrop-blur-xl sticky top-0 z-50 shadow-sm transition-colors duration-300">
             <div className="px-4 sm:px-6 py-3">
                 <div className="flex items-center justify-between">
                     <Link to="/home" className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-300">
-                        <div className="text-2xl sm:text-3xl">??</div>
+                        <div className="text-2xl sm:text-3xl">{'\u{1F393}'}</div>
                         <div>
                             <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white transition-colors duration-300">
                                 AI Proctoring & Learning System
@@ -65,7 +71,7 @@ function Header() {
                             <Link
                                 key={link.path}
                                 to={link.path}
-                                className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-1.5 sm:gap-2 hover:scale-105 ${location.pathname === link.path
+                                className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-1.5 sm:gap-2 hover:scale-105 ${isActive(link.path)
                                     ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md shadow-cyan-500/30'
                                     : 'bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600/50 hover:text-gray-900 dark:hover:text-white'
                                     }`}

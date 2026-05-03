@@ -24,6 +24,14 @@ function HomePage() {
             gradient: 'from-emerald-500 to-teal-500',
             link: '/mcq-diagrams',
             stats: { label: 'Practice Mode', value: 'Ready' }
+        },
+        {
+            icon: '\u{1F399}\uFE0F',
+            title: 'Voice Answer Platform',
+            description: 'Answer short questions using your voice with focused feedback on marks, topic gaps, and speaking confidence.',
+            gradient: 'from-fuchsia-500 to-pink-500',
+            link: '/voice-quiz',
+            stats: { label: 'Voice Feedback', value: 'AI Assisted' }
         }
     ];
 
@@ -72,6 +80,11 @@ function HomePage() {
                             <Link to="/mcq-diagrams" className="group px-5 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-semibold text-sm sm:text-base shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 hover:scale-105 flex items-center gap-2">
                                 <span className="text-lg sm:text-xl">{'\u{1F4CA}'}</span>
                                 MCQ & Diagrams
+                                <span className="group-hover:translate-x-1 transition-transform duration-300">-&gt;</span>
+                            </Link>
+                            <Link to="/voice-quiz" className="group px-5 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white rounded-xl font-semibold text-sm sm:text-base shadow-lg shadow-fuchsia-500/30 hover:shadow-fuchsia-500/50 transition-all duration-300 hover:scale-105 flex items-center gap-2">
+                                <span className="text-lg sm:text-xl">{'\u{1F399}\uFE0F'}</span>
+                                Answer using Voice
                                 <span className="group-hover:translate-x-1 transition-transform duration-300">-&gt;</span>
                             </Link>
                         </div>
