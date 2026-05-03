@@ -37,5 +37,5 @@ CORS_ORIGINS = [
     if origin.strip()
 ]
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY", "")
+GOOGLE_MODEL = os.getenv("GOOGLE_MODEL") or os.getenv("GEMINI_MODEL_NAME", "")

@@ -35,13 +35,26 @@ class ProctoringEngine:
     
     def __init__(self):
         """Initialize MediaPipe Face Mesh and state tracking"""
-        self.mp_face_mesh = mp.solutions.face_mesh
-        self.face_mesh = self.mp_face_mesh.FaceMesh(
-            max_num_faces=MAX_NUM_FACES,
-            refine_landmarks=True,
-            min_detection_confidence=MIN_DETECTION_CONFIDENCE,
-            min_tracking_confidence=MIN_TRACKING_CONFIDENCE
-        )
+        self.mp_face_mesh = None
+        self.face_mesh = None
+        self.mediapipe_available = False
+        try:
+            # Older MediaPipe builds expose mp.solutions.*; some newer wheels do not.
+            if hasattr(mp, "solutions") and hasattr(mp.solutions, "face_mesh"):
+                self.mp_face_mesh = mp.solutions.face_mesh
+                self.face_mesh = self.mp_face_mesh.FaceMesh(
+                    max_num_faces=MAX_NUM_FACES,
+                    refine_landmarks=True,
+                    min_detection_confidence=MIN_DETECTION_CONFIDENCE,
+                    min_tracking_confidence=MIN_TRACKING_CONFIDENCE,
+                )
+                self.mediapipe_available = True
+            else:
+                logger.warning("MediaPipe FaceMesh API is unavailable in this environment; face proctoring disabled.")
+        except Exception as e:
+            logger.exception(f"Failed to initialize MediaPipe FaceMesh: {e}")
+            self.face_mesh = None
+            self.mediapipe_available = False
         
         # State tracking
         self.head_turn_start_time = None
@@ -87,8 +100,8 @@ class ProctoringEngine:
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         height, width = frame.shape[:2]
         
-        # Process with MediaPipe
-        results = self.face_mesh.process(rgb_frame)
+        # Process with MediaPipe if available
+        results = self.face_mesh.process(rgb_frame) if self.face_mesh is not None else None
         
         # Initialize status
         status = StatusUpdate(
@@ -128,6 +141,12 @@ class ProctoringEngine:
                 status.status = "violation_detected"
                 return alert, status
         
+        if results is None:
+            # Keep stream alive even when FaceMesh is unavailable on this runtime.
+            status.status = "monitoring_degraded"
+            status.face_detected = False
+            return alert, status
+
         if not results.multi_face_landmarks:
             # No face detected
             alert = self._create_alert(AlertType.NO_FACE, current_time)
@@ -393,4 +412,5 @@ class ProctoringEngine:
     
     def cleanup(self):
         """Cleanup resources"""
-        self.face_mesh.close()
+        if self.face_mesh is not None:
+            self.face_mesh.close()
