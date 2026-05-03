@@ -526,3 +526,76 @@ timestamp,question_id,question_text,transcript,grade_level,grade_marks,coverage
 2026-05-01T17:00:33,Q112,Programming,What does the readline() method do?,and parameter method.,INCORRECT,0,0.04458712804989773
 2026-05-01T17:00:49,Q79,Web Technologies,What does the <ul> tag create?,That create.,INCORRECT,1,0.0
 2026-05-01T17:01:02,Q93,Programming,What is elif in Python?,Elif,INCORRECT,1,0.0
+2026-05-03T18:14:41,Q75,Systems Analysis,What is 'Prototyping' in SDLC?,"Thank you, I'm welcome. Hello.",INCORRECT,0,0.05055839195847511
+2026-05-03T18:15:33,Q183,Building Blocks of IS,What is a 'Logic Gate'?,"What slowly strong, ABCD?",INCORRECT,0,0.05700470507144928
+2026-05-03T18:15:48,Q234,Systems Analysis,What is 'System Testing'?,ABCD.,INCORRECT,0,0.012696224264800549
+2026-05-03T18:16:20,Q38,DBMS,What is a 'Database Management System' (DBMS)?,What is database management system?,INCORRECT,1,0.0
+2026-05-03T18:16:31,Q161,Building Blocks of IS,What is 'SRAM' (Static RAM)?,A static RAM.,INCORRECT,1,0.0
+2026-05-03T18:16:41,Q54,Networking,What is 'Ring Topology'?,Ring topology.,INCORRECT,1,0.0
+2026-05-03T18:16:47,Q24,Networking,What is 'Guided Media'?,Guided media.,INCORRECT,1,0.0
+2026-05-03T18:16:52,Q208,Networking,Define 'Network Protocol'.,network protocol.,INCORRECT,1,0.0
+2026-05-03T18:17:52,Q8,Data Representation,What is 'Unicode'?,Unicode is the standard that gives the unique code to every character so all languages can be displayed correctly.,WEAK,4,0.37379590442404154
+2026-05-03T18:18:30,Q100,Operating Systems,What is 'Systems Software'?,"These too software to control some companies, including hardware comes from other programs.",WEAK,3,0.28934146877129874
+2026-05-03T18:31:29,Q131,Networking,What is 'Simplex' transmission?,Blah blah blah blah blah blah.,INCORRECT,0,0.0
+2026-05-03T18:31:35,Q65,DBMS,What is a 'Candidate Key'?,Candidate key is a candidate with one purpose.,WEAK,3,0.30330364091671075
+2026-05-03T18:31:42,Q215,DBMS,What is a 'Composite Attribute'?,What is the composite attribute?,INCORRECT,1,0.0
+2026-05-03T18:31:47,Q134,Networking,What is a 'MAC Address'?,Make Address is the Make Address Make Address.,INCORRECT,0,0.13226226078967254
+2026-05-03T18:31:57,Q81,Web Technologies,What is 'Internal CSS'?,"CSS. Internal CSS, Internal Communication.",WEAK,3,0.2524217233832248
+2026-05-03T18:32:06,Q159,Building Blocks of IS,What is the 'Address Bus'?,Address Bus AB-A-B-A-N.,INCORRECT,0,0.23576250259341167
+2026-05-03T18:34:24,Q91,Programming,What does the if statement do?,A statement do the what is the do do do.,INCORRECT,1,0.0
+2026-05-03T18:34:31,Q104,IoT,Why is a resistor used with an LED in Arduino circuits?,Arduino circuit is the best circuit of the world.,INCORRECT,0,0.048446451534982775
+2026-05-03T18:34:37,Q30,Networking,What is an 'IP Address'?,IW Address is the MAC address.,INCORRECT,0,0.2093074679374695
+2026-05-03T18:34:42,Q157,Building Blocks of IS,Define 'System Bus'.,"System bus, Divine Bus Bus.",WEAK,3,0.267416264017423
+2026-05-03T18:49:14,Q201,Data Representation,What is 'Unicode'?,What is Unicode?,INCORRECT,1,0.0
+2026-05-03T18:49:19,Q130,Networking,What is 'Latency' in a network?,What is latent signal?,INCORRECT,0,0.13327406821772456
+2026-05-03T18:49:26,Q9,Building Blocks of IS,What is a 'Truth Table' in Logic Gates?,To table is a logic gate method.,WEAK,3,0.27660693163673084
+2026-05-03T18:49:32,Q117,Building Blocks of IS,What is a 'Half Adder'?,Half Adder is a best method.,PARTIAL,5,0.549180018901825
+2026-05-03T18:49:42,Q220,Systems Analysis,What is 'SDLC' (Systems Development Life Cycle)?,System Development Life Cycle...,INCORRECT,1,0.0
+2026-05-03T18:49:51,Q140,DBMS,What does the DROP TABLE command do?,"DROP TABLE command do, remove the table, and in that it is Q-Wir.",INCORRECT,0,0.17043322291535637
+2026-05-03T18:49:58,Q136,Networking,What is the function of a 'Router'?,Router make an IV address.,PARTIAL,5,0.49230738878250124
+2026-05-03T18:50:04,Q245,Building Blocks of IS,What is a 'Truth Table'?,The truth table makes SQL tables.,WEAK,3,0.28039810679175636
+2026-05-03T18:50:13,Q147,Systems Analysis,What is 'Black Box Testing'?,BlackBurf testing is software called Yejurans testing method.,INCORRECT,0,0.2080179470201785
+2026-05-03T18:50:20,Q2,Concepts of ICT,Define 'Data' in ICT.,"ICT is the best method of the ICT, information technology.",INCORRECT,0,0.0797699386253953
+2026-05-03T19:05:37,Q83,Programming,What is an 'Interpreter' in Python?,Either needs the best Linux.,INCORRECT,0,0.037920361344004054
+2026-05-03T19:06:12,Q150,Systems Analysis,What is 'System Testing'?,It's check whether the entire application works correctly from start to end.,INCORRECT,0,0.24104699373245242
+2026-05-03T19:06:51,Q145,Systems Analysis,What is the 'Waterfall Model' in SDLC?,Waterfall Model is a linear and sequential SDLC model where development flow step by step through the phase-like requirement design implementation testing and maintenance.,GOOD,7,0.7450071287155151
+2026-05-03T19:07:24,Q84,Programming,What is the function of print() in Python?,Print() in Python used to display output text or value on screen.,GOOD,7,0.7113780355453491
+2026-05-03T19:07:50,Q53,Networking,Describe 'Bus Topology'.,A bus topology is a network type where all devices are connected to a single central cable.,PARTIAL,6,0.6255757258733115
+2026-05-03T19:07:55,Q50,Systems Analysis,What is 'Parallel Deployment'?,Parallel deployment is a good bye-bye.,INCORRECT,0,0.19470552656727916
+2026-05-03T19:08:26,Q163,Building Blocks of IS,What is 'ROM' (Read-Only Memory)?,ROM is a type of memory that stores permanent data and instructions which can't be easily modified and remain even when the power is turned off.,WEAK,4,0.36284132410179487
+2026-05-03T19:08:50,Q82,Web Technologies,What is 'Inline CSS'?,Inline CSS is a way of applying style directly to an HTML elements using the style attribute.,GOOD,9,0.8586772070990668
+2026-05-03T19:08:57,Q80,Web Technologies,What does the <ol> tag create?,Or it creates a skewer.,INCORRECT,0,0.07616568399127573
+2026-05-03T19:09:04,Q192,Data Representation,What is 'Octal Number System'?,Octal number system is... I don't know.,WEAK,4,0.354871058622996
+2026-05-03T19:12:04,Q3,Concepts of ICT,Define 'Information'.,Define information is serviced.,PARTIAL,6,0.5791438648435805
+2026-05-03T19:12:48,Q221,Systems Analysis,What is 'Requirement Gathering' in SDLC?,"Requirement Gathering is a SDLC, it is a phase where all users need and system requirement, all collected analysis document before the development begins.",WEAK,4,0.35565808245629976
+2026-05-03T19:13:10,Q176,ICT and Society,What is 'Open Source Software'?,"Open Source Software is a software, source code is freely available for anyone to view, modify, and distribute.",WEAK,4,0.3993051507396417
+2026-05-03T19:13:43,Q193,Data Representation,What is 'Hexadecimal Number System'?,A hexadecimal number system is a base-16 number system that uses digits 0-9 and letters A-F.,GOOD,9,0.8812755012512208
+2026-05-03T19:13:59,Q70,DBMS,What is DML (Data Manipulation Language)?,"Is a set of SQL command using INSERT update, delete, and retrieve data from the database.",GOOD,7,0.738827649752299
+2026-05-03T19:14:22,Q238,Programming,What is a 'Runtime Error'?,"It is an error that occurs while the program is running, causing it to crash or behave exponentially.",PARTIAL,5,0.49785619941726333
+2026-05-03T19:14:30,Q167,Building Blocks of IS,What is 'Seek Time' in hard disks?,Seek Time I...,INCORRECT,1,0.0
+2026-05-03T19:14:40,Q191,Building Blocks of IS,What is a 'Flip-Flop'?,Flip-Flop.,INCORRECT,1,0.0
+2026-05-03T19:14:49,Q18,Operating Systems,What is 'Spooling'?,,INCORRECT,0,0.0
+2026-05-03T19:15:06,Q18,Operating Systems,What is 'Spooling'?,"Spooling is a process where data is temporarily held to be used and executed by a device, program, or system, or system, or system, or system.",GOOD,10,0.9839586615562439
+2026-05-03T19:15:29,Q71,DBMS,What is '1NF' (First Normal Form)?,database normalization role where each table cell contain only atomic values and there are no repeating group or multi-value attributes,GOOD,8,0.7809236609630096
+2026-05-03T19:21:44,Q14,Operating Systems,Define 'Context Switching'.,Context switching.,INCORRECT,1,0.0
+2026-05-03T19:21:55,Q64,Systems Analysis,What is an 'External Entity' in Systems Analysis?,System Analysis.,INCORRECT,0,0.16368092224829728
+2026-05-03T19:22:05,Q216,DBMS,What is 'SQL Injection'?,SQL Injection.,INCORRECT,1,0.0
+2026-05-03T19:22:23,Q43,DBMS,What is 'Data Redundancy'?,"Actually, it that enters a database.",INCORRECT,0,0.19400701089154204
+2026-05-03T19:22:39,Q225,Systems Analysis,What is 'Operational Feasibility'?,The proposed system solves the problems and fits into the organization's operations.,PARTIAL,5,0.462982483908534
+2026-05-03T19:22:59,Q240,Programming,What is 'Type Casting'?,Type Casting.,INCORRECT,1,0.0
+2026-05-03T19:23:45,Q184,Building Blocks of IS,What is a 'NAND' Gate?,A NAND gate is a logic gate that gives output 0 only if all inputs are 1 otherwise the output is 1.,WEAK,4,0.3775001660260287
+2026-05-03T19:24:08,Q69,DBMS,What is DDL (Data Definition Language)?,DDL is used to create and modify database structures.,WEAK,3,0.32939131181438763
+2026-05-03T19:24:36,Q73,DBMS,What is '3NF' (Third Normal Form)?,3NF is a database design. Rule is all data depends only on the primary key. Removing unnecessary,WEAK,3,0.3036515636816621
+2026-05-03T19:25:06,Q209,Networking,What is the 'Application Layer' in the OSI model?,Application layer is the top layer of the network model that provides service to user applications.,WEAK,4,0.3973603287804872
+2026-05-03T19:38:42,Q102,IoT,What is the function of analogWrite() in Arduino?,The function is analogWrite(),INCORRECT,1,0.0
+2026-05-03T19:39:03,Q102,IoT,What is the function of analogWrite() in Arduino?,The function of analogWrite() is a function of analogWrite() in Arduino.,INCORRECT,1,0.0
+2026-05-03T20:04:28,Q102,IoT,What is the function of analogWrite() in Arduino?,"In addition I emphasis the button T1 E З Marken, whichize you different цвет laws schools while keeping the Edit System layer safe.",INCORRECT,0,0.007647139485925436
+2026-05-03T20:04:45,Q48,Systems Analysis,What is 'Black Box Testing'?,The data is Black Box Testing.,INCORRECT,1,0.0
+2026-05-03T20:05:10,Q241,Programming,What is a 'Function Parameter'?,alah I see that . . . There are many other things available for updates.,INCORRECT,0,0.0
+2026-05-03T20:05:31,Q16,Operating Systems,What is 'Fragmentation' in memory management?,"Fragmentation is a phenomenon where storage space is used inefficiently, reducing capacity or performance.",GOOD,10,0.9842609763145447
+2026-05-03T20:05:40,Q160,Building Blocks of IS,What is the 'Control Bus'?,"Yeah, control bus.",INCORRECT,0,0.20179736266420648
+2026-05-03T20:06:02,Q230,Systems Analysis,What is 'Prototyping'?,A portal talking?,INCORRECT,0,0.009704871103167534
+2026-05-03T20:06:32,Q194,Data Representation,What is the 'MSB' (Most Significant Bit)?,MSB.,INCORRECT,1,0.0
+2026-05-03T20:07:00,Q5,Building Blocks of IS,What is a 'Volatile Memory'?,Volatile memory is memory that loses its data when the power is turned off.,GOOD,9,0.924985408782959
+2026-05-03T20:07:24,Q179,ICT and Society,What is a 'Computer Virus'?,"A computer virus is a software program that separates, spread and damage or destruct a computer system.",GOOD,7,0.6680258644544163
+2026-05-03T20:07:43,Q112,Programming,What does the readline() method do?,See you later.,INCORRECT,0,0.017142513766884804

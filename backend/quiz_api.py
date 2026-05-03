@@ -495,6 +495,45 @@ def submit_quiz(body: QuizSubmitIn, user=Depends(get_current_user)):
         "submitted_at": submitted_at.isoformat(),
     }
 
+
+@router.get("/session/{session_id}")
+def get_quiz_session(session_id: str, user=Depends(get_current_user)):
+    sessions = col("quiz_sessions")
+    try:
+        _id = ObjectId(session_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid session_id")
+
+    d = sessions.find_one({"_id": _id, "user_id": user["id"]})
+    if not d:
+        d = sessions.find_one({"_id": _id})
+        if not d:
+            raise HTTPException(status_code=404, detail="session not found")
+        if d.get("user_id") and d.get("user_id") != user["id"]:
+            # Older local sessions may have been created before auth switched
+            # backends. Attach the currently logged-in user so reload works.
+            sessions.update_one(
+                {"_id": _id},
+                {"$set": {"user_id": user["id"], "user_email": user.get("email")}},
+            )
+            d["user_id"] = user["id"]
+            d["user_email"] = user.get("email")
+
+    return {
+        "session_id": str(d["_id"]),
+        "mode": d.get("mode"),
+        "answers": d.get("answers") or [],
+        "total_marks": int(d.get("total_marks", 0)),
+        "report_summary": d.get("report_summary") or {},
+        "voice_pattern": d.get("voice_pattern") or {},
+        "topic_report": d.get("topic_report") or {},
+        "feedback": d.get("feedback") or {},
+        "topic_insights": d.get("topic_insights") or {},
+        "started_at": _dt_iso(d.get("started_at")),
+        "submitted_at": _dt_iso(d.get("submitted_at")),
+        "status": d.get("status"),
+    }
+
 # Return recent submitted quiz sessions for the current user,
 # with summary fields and feedback-ready data.
 @router.get("/submitted")
