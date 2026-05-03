@@ -64,3 +64,4 @@ openai-whisper
 google-generativeai
 google-genai
 reportlab
+ultralytics>=8.4.46

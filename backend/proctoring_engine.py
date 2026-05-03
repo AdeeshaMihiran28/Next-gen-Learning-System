@@ -1,4 +1,4 @@
-"""
+﻿"""
 Core proctoring engine with MediaPipe Face Mesh integration
 Handles face detection, head pose estimation, and mouth movement detection
 """
@@ -7,21 +7,31 @@ import numpy as np
 import mediapipe as mp
 import time
 import logging
+import os
 from typing import Optional, Tuple, Dict
 from models import AlertType, AlertEvent, Severity, StatusUpdate
 
 # Import YOLO for object detection (e.g. phones)
 try:
+    os.environ.setdefault(
+        "YOLO_CONFIG_DIR",
+        os.path.join(os.path.dirname(__file__), "data", "ultralytics")
+    )
     from ultralytics import YOLO
-except ImportError:
+    YOLO_IMPORT_ERROR = None
+except Exception as e:
     YOLO = None
+    YOLO_IMPORT_ERROR = e
 
 logger = logging.getLogger(__name__)
+_MEDIAPIPE_WARNING_SHOWN = False
 from config import (
     YAW_THRESHOLD,
     MAR_THRESHOLD,
     HEAD_TURN_DURATION,
     ALERT_COOLDOWN,
+    NO_FACE_GRACE_PERIOD,
+    PHONE_ALERT_RESET_SECONDS,
     MIN_DETECTION_CONFIDENCE,
     MIN_TRACKING_CONFIDENCE,
     MAX_NUM_FACES,
@@ -35,9 +45,15 @@ class ProctoringEngine:
     
     def __init__(self):
         """Initialize MediaPipe Face Mesh and state tracking"""
+        global _MEDIAPIPE_WARNING_SHOWN
         self.mp_face_mesh = None
         self.face_mesh = None
         self.mediapipe_available = False
+        self.face_cascades = [
+            cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml"),
+            cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_alt2.xml"),
+            cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_profileface.xml"),
+        ]
         try:
             # Older MediaPipe builds expose mp.solutions.*; some newer wheels do not.
             if hasattr(mp, "solutions") and hasattr(mp.solutions, "face_mesh"):
@@ -50,7 +66,9 @@ class ProctoringEngine:
                 )
                 self.mediapipe_available = True
             else:
-                logger.warning("MediaPipe FaceMesh API is unavailable in this environment; face proctoring disabled.")
+                if not _MEDIAPIPE_WARNING_SHOWN:
+                    logger.info("MediaPipe FaceMesh API is unavailable; face proctoring is running in degraded mode.")
+                    _MEDIAPIPE_WARNING_SHOWN = True
         except Exception as e:
             logger.exception(f"Failed to initialize MediaPipe FaceMesh: {e}")
             self.face_mesh = None
@@ -61,6 +79,9 @@ class ProctoringEngine:
         self.current_violation = None
         self.last_alert_time = 0
         self.last_alert_type = None
+        self.no_face_start_time = None
+        self.phone_present = False
+        self.last_phone_seen_time = None
         
         # 3D model points for head pose estimation
         self.model_points = np.array([
@@ -81,6 +102,10 @@ class ProctoringEngine:
                 logger.error(f"Failed to load YOLO model: {e}")
                 self.yolo_model = None
         else:
+            if YOLO_IMPORT_ERROR:
+                logger.warning("YOLO mobile phone detection is disabled: %s", YOLO_IMPORT_ERROR)
+            else:
+                logger.warning("ultralytics is not installed; mobile phone detection is disabled.")
             self.yolo_model = None
         
     def process_frame(self, frame: np.ndarray) -> Tuple[Optional[AlertEvent], StatusUpdate]:
@@ -107,54 +132,62 @@ class ProctoringEngine:
         status = StatusUpdate(
             status="processing",
             face_detected=False,
+            face_status="missing",
             timestamp=timestamp
         )
-        
-        alert = None
-        
-        # Priority 0: Object Detection for Cell Phones
-        if self.yolo_model is not None:
-            # YOLO processes BGR natively, so we pass frame directly
-            yolo_results = self.yolo_model(frame, verbose=False, conf=0.25)
-            phone_detected = False
-            best_conf = 0.0
-            for r in yolo_results:
-                for box in r.boxes:
-                    class_id = int(box.cls[0])
-                    conf = float(box.conf[0])
-                    # COCO class 67 is 'cell phone'
-                    if class_id == 67:
-                        logger.debug(f"Cell phone detected with confidence {conf:.2f}")
-                        if conf > best_conf:
-                            best_conf = conf
-                        if conf > 0.25:
-                            phone_detected = True
-                            break
-                if phone_detected:
-                    break
 
-            if phone_detected:
-                logger.info(f"PHONE_DETECTED alert — confidence {best_conf:.2f}")
-                if current_time - self.last_alert_time >= ALERT_COOLDOWN:
-                    alert = self._create_alert(AlertType.PHONE_DETECTED, current_time)
-                    self._reset_timers()
-                status.status = "violation_detected"
-                return alert, status
+        alert = None
+
+        # Priority 0: Object Detection for Cell Phones
+        phone_detected, phone_conf = self._detect_phone(frame)
+        if phone_detected:
+            self.last_phone_seen_time = current_time
+            if not self.phone_present and current_time - self.last_alert_time >= ALERT_COOLDOWN:
+                logger.info("PHONE_DETECTED alert - confidence %.2f", phone_conf)
+                alert = self._create_alert(AlertType.PHONE_DETECTED, current_time)
+                self._reset_timers()
+            self.phone_present = True
+            status.status = "violation_detected"
+            return alert, status
+        elif self.last_phone_seen_time is not None:
+            if current_time - self.last_phone_seen_time >= PHONE_ALERT_RESET_SECONDS:
+                self.phone_present = False
+                self.last_phone_seen_time = None
         
         if results is None:
-            # Keep stream alive even when FaceMesh is unavailable on this runtime.
-            status.status = "monitoring_degraded"
-            status.face_detected = False
+            # Fallback for runtimes where MediaPipe FaceMesh is unavailable.
+            face_status = self._detect_face_with_opencv(frame)
+            status.face_status = face_status
+            status.face_detected = face_status in {"centered", "partial"}
+            if status.face_detected:
+                status.status = "monitoring"
+                self.no_face_start_time = None
+                self._reset_timers()
+                return alert, status
+
+            if self.no_face_start_time is None:
+                self.no_face_start_time = current_time
+            missing_duration = current_time - self.no_face_start_time
+            status.status = "monitoring" if missing_duration < NO_FACE_GRACE_PERIOD else "no_face"
+            if missing_duration >= NO_FACE_GRACE_PERIOD and current_time - self.last_alert_time >= ALERT_COOLDOWN:
+                alert = self._create_alert(AlertType.NO_FACE, current_time)
             return alert, status
 
         if not results.multi_face_landmarks:
             # No face detected
-            alert = self._create_alert(AlertType.NO_FACE, current_time)
-            status.status = "no_face"
+            status.face_status = "missing"
+            if self.no_face_start_time is None:
+                self.no_face_start_time = current_time
+            missing_duration = current_time - self.no_face_start_time
+            status.status = "monitoring" if missing_duration < NO_FACE_GRACE_PERIOD else "no_face"
+            if missing_duration >= NO_FACE_GRACE_PERIOD and current_time - self.last_alert_time >= ALERT_COOLDOWN:
+                alert = self._create_alert(AlertType.NO_FACE, current_time)
             self._reset_timers()
         else:
             # Face detected
             status.face_detected = True
+            status.face_status = "centered"
+            self.no_face_start_time = None
             face_landmarks = results.multi_face_landmarks[0]
             
             # Calculate head pose
@@ -181,6 +214,83 @@ class ProctoringEngine:
                 status.status = "monitoring"
         
         return alert, status
+
+    def _detect_phone(self, frame: np.ndarray) -> Tuple[bool, float]:
+        if self.yolo_model is None:
+            return False, 0.0
+
+        yolo_results = self.yolo_model(frame, verbose=False, conf=0.25)
+        best_conf = 0.0
+        for result in yolo_results:
+            names = getattr(result, "names", None) or getattr(self.yolo_model, "names", {})
+            for box in result.boxes:
+                class_id = int(box.cls[0])
+                conf = float(box.conf[0])
+                class_name = str(names.get(class_id, "")).lower()
+                is_phone = class_id == 67 or "cell phone" in class_name or class_name == "phone"
+                if is_phone:
+                    best_conf = max(best_conf, conf)
+                    if conf >= 0.25:
+                        return True, best_conf
+
+        return False, best_conf
+
+    def _detect_face_with_opencv(self, frame: np.ndarray) -> str:
+        cascades = [cascade for cascade in self.face_cascades if not cascade.empty()]
+        if not cascades:
+            logger.warning("OpenCV face cascades failed to load.")
+            return "missing"
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        normalized = cv2.equalizeHist(gray)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(normalized)
+
+        candidate_images = [gray, normalized, enhanced]
+        candidate_params = [
+            {"scaleFactor": 1.05, "minNeighbors": 4, "minSize": (60, 60)},
+            {"scaleFactor": 1.1, "minNeighbors": 5, "minSize": (80, 80)},
+            {"scaleFactor": 1.15, "minNeighbors": 3, "minSize": (50, 50)},
+        ]
+
+        for image in candidate_images:
+            for cascade in cascades:
+                for params in candidate_params:
+                    faces = cascade.detectMultiScale(image, **params)
+                    for face in faces:
+                        bbox_state = self._classify_face_bbox(face, frame.shape[1], frame.shape[0])
+                        if bbox_state != "missing":
+                            return bbox_state
+
+        return "missing"
+
+    def _classify_face_bbox(self, face: tuple, frame_width: int, frame_height: int) -> str:
+        x, y, w, h = [int(v) for v in face]
+
+        area_ratio = (w * h) / float(frame_width * frame_height)
+        if area_ratio < 0.025:
+            return "missing"
+
+        center_x = x + (w / 2.0)
+        center_y = y + (h / 2.0)
+        edge_margin_x = frame_width * 0.08
+        edge_margin_y = frame_height * 0.05
+        clipped = (
+            x < edge_margin_x or
+            (x + w) > (frame_width - edge_margin_x) or
+            y < edge_margin_y or
+            (y + h) > (frame_height - edge_margin_y)
+        )
+        centered = (
+            frame_width * 0.2 <= center_x <= frame_width * 0.8 and
+            frame_height * 0.2 <= center_y <= frame_height * 0.82
+        )
+
+        if centered and not clipped:
+            return "centered"
+        if area_ratio >= 0.035:
+            return "partial"
+        return "missing"
     
     def _calculate_head_pose(
         self, 

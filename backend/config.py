@@ -9,6 +9,8 @@ MAR_THRESHOLD = 0.6  # Mouth Aspect Ratio threshold for talking detection
 # Timer Settings (in seconds)
 HEAD_TURN_DURATION = 5  # seconds - how long user must turn head before alert
 ALERT_COOLDOWN = 3  # seconds - cooldown between repeated alerts
+NO_FACE_GRACE_PERIOD = 1.0  # seconds - face must be missing this long before alerting
+PHONE_ALERT_RESET_SECONDS = 1.5  # seconds - phone must disappear this long before re-alerting
 
 # MediaPipe Settings
 MIN_DETECTION_CONFIDENCE = 0.5

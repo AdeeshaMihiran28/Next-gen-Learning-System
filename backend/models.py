@@ -50,6 +50,7 @@ class StatusUpdate(BaseModel):
     """Status update for monitoring"""
     status: str
     face_detected: bool
+    face_status: Optional[str] = None
     head_pose: Optional[dict] = None
     mouth_status: Optional[str] = None
     timestamp: str
