@@ -65,7 +65,6 @@ export default function ProctoringWidget({ isActive, language = 'en' }) {
             // Show phone detection overlay
             if (alertData.alert_type === 'PHONE_DETECTED') {
                 setPhoneDetected(true);
-                setTimeout(() => setPhoneDetected(false), 6000);
             }
 
             // Add to violation history if it's an actual violation
@@ -81,10 +80,12 @@ export default function ProctoringWidget({ isActive, language = 'en' }) {
                 pushEvent(evType, alertData);
             }
 
-            // Clear alert after 5 seconds
-            setTimeout(() => {
-                setCurrentAlert(null);
-            }, 5000);
+            if (alertData.alert_type !== 'PHONE_DETECTED') {
+                // Clear non-phone alerts after 5 seconds
+                setTimeout(() => {
+                    setCurrentAlert(null);
+                }, 5000);
+            }
         } else if (lastMessage.type === 'status') {
             setStatus(lastMessage.data);
         } else if (lastMessage.type === 'audio_transcript') {
@@ -144,7 +145,10 @@ export default function ProctoringWidget({ isActive, language = 'en' }) {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         animation: 'fadeInOverlay 0.3s ease'
                     }}
-                    onClick={() => setPhoneDetected(false)}
+                    onClick={() => {
+                        setPhoneDetected(false);
+                        setCurrentAlert(null);
+                    }}
                 >
                     <div style={{
                         background: 'linear-gradient(135deg, #dc2626, #991b1b)',

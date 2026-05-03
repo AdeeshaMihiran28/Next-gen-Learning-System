@@ -11,6 +11,8 @@ export const useWebSocket = (url) => {
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
+  const shouldReconnectRef = useRef(false);
+  const connectionIdRef = useRef(0);
   const maxReconnectAttempts = 10;
   const baseReconnectDelay = 1000; // 1 second
 
@@ -21,9 +23,13 @@ export const useWebSocket = (url) => {
     }
 
     try {
+      const connectionId = connectionIdRef.current + 1;
+      connectionIdRef.current = connectionId;
       const ws = new WebSocket(url);
+      wsRef.current = ws;
 
       ws.onopen = () => {
+        if (wsRef.current !== ws || connectionIdRef.current !== connectionId) return;
         console.log('WebSocket connected');
         setIsConnected(true);
         setError(null);
@@ -31,6 +37,7 @@ export const useWebSocket = (url) => {
       };
 
       ws.onmessage = (event) => {
+        if (wsRef.current !== ws || connectionIdRef.current !== connectionId) return;
         try {
           const data = JSON.parse(event.data);
           setLastMessage(data);
@@ -40,16 +47,18 @@ export const useWebSocket = (url) => {
       };
 
       ws.onerror = (err) => {
+        if (wsRef.current !== ws || connectionIdRef.current !== connectionId) return;
         console.error('WebSocket error:', err);
         setError('Connection error');
       };
 
       ws.onclose = () => {
+        if (wsRef.current !== ws || connectionIdRef.current !== connectionId) return;
         console.log('WebSocket disconnected');
         setIsConnected(false);
 
         // Attempt to reconnect with exponential backoff
-        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+        if (shouldReconnectRef.current && reconnectAttemptsRef.current < maxReconnectAttempts) {
           const delay = Math.min(
             baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current),
             30000 // Max 30 seconds
@@ -61,12 +70,10 @@ export const useWebSocket = (url) => {
             reconnectAttemptsRef.current += 1;
             connect();
           }, delay);
-        } else {
+        } else if (shouldReconnectRef.current) {
           setError('Max reconnection attempts reached');
         }
       };
-
-      wsRef.current = ws;
     } catch (err) {
       console.error('Failed to create WebSocket:', err);
       setError('Failed to connect');
@@ -74,15 +81,24 @@ export const useWebSocket = (url) => {
   }, [url]);
 
   useEffect(() => {
+    shouldReconnectRef.current = Boolean(url);
     connect();
 
     return () => {
+      shouldReconnectRef.current = false;
+      connectionIdRef.current += 1;
       // Cleanup on unmount
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
       }
       if (wsRef.current) {
+        wsRef.current.onopen = null;
+        wsRef.current.onmessage = null;
+        wsRef.current.onerror = null;
+        wsRef.current.onclose = null;
         wsRef.current.close();
+        wsRef.current = null;
       }
     };
   }, [connect]);
@@ -92,11 +108,11 @@ export const useWebSocket = (url) => {
       wsRef.current.send(typeof data === 'string' ? data : JSON.stringify(data));
       return true;
     }
-    console.warn('WebSocket is not connected');
     return false;
   }, []);
 
   const reconnect = useCallback(() => {
+    shouldReconnectRef.current = Boolean(url);
     if (wsRef.current) {
       wsRef.current.close();
     }

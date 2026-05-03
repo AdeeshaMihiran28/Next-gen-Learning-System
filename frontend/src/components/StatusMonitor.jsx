@@ -1,12 +1,22 @@
-/**
+﻿/**
  * StatusMonitor Component
  * Displays real-time monitoring status and statistics
  */
 export default function StatusMonitor({ isConnected, status, violationHistory = [] }) {
+    const faceStatus = status?.face_status || (status?.face_detected ? 'centered' : 'missing');
+    const faceStatusLabel =
+        faceStatus === 'centered' ? 'Face Centered' :
+        faceStatus === 'partial' ? 'Face Partial' :
+        'Face Missing';
+    const faceStatusClass =
+        faceStatus === 'centered' ? 'text-green-400' :
+        faceStatus === 'partial' ? 'text-yellow-400' :
+        'text-red-400';
+
     return (
         <div className="status-monitor p-6 bg-gray-800/50 border border-gray-700/50 rounded-2xl backdrop-blur-xl">
             <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <span className="text-2xl">📊</span>
+                <span className="text-2xl">|</span>
                 Monitoring Status
             </h2>
 
@@ -15,7 +25,7 @@ export default function StatusMonitor({ isConnected, status, violationHistory = 
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-400 text-sm">Connection</span>
                     <span className={`font-semibold ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
-                        {isConnected ? '● Connected' : '○ Disconnected'}
+                        {isConnected ? 'Connected' : 'Disconnected'}
                     </span>
                 </div>
             </div>
@@ -26,8 +36,8 @@ export default function StatusMonitor({ isConnected, status, violationHistory = 
                     <div className="p-4 bg-gray-900/50 rounded-xl">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-gray-400 text-sm">Face Detection</span>
-                            <span className={`font-semibold ${status.face_detected ? 'text-green-400' : 'text-red-400'}`}>
-                                {status.face_detected ? '✓ Detected' : '✗ Not Detected'}
+                            <span className={`font-semibold ${faceStatusClass}`}>
+                                {faceStatusLabel}
                             </span>
                         </div>
                     </div>
@@ -41,19 +51,19 @@ export default function StatusMonitor({ isConnected, status, violationHistory = 
                                     <div className="text-xs text-gray-500 mb-1">Yaw</div>
                                     <div className={`text-lg font-bold ${Math.abs(status.head_pose.yaw) > 30 ? 'text-red-400' : 'text-green-400'
                                         }`}>
-                                        {status.head_pose.yaw}°
+                                        {status.head_pose.yaw} deg
                                     </div>
                                 </div>
                                 <div className="text-center">
                                     <div className="text-xs text-gray-500 mb-1">Pitch</div>
                                     <div className="text-lg font-bold text-gray-300">
-                                        {status.head_pose.pitch}°
+                                        {status.head_pose.pitch} deg
                                     </div>
                                 </div>
                                 <div className="text-center">
                                     <div className="text-xs text-gray-500 mb-1">Roll</div>
                                     <div className="text-lg font-bold text-gray-300">
-                                        {status.head_pose.roll}°
+                                        {status.head_pose.roll} deg
                                     </div>
                                 </div>
                             </div>
@@ -67,7 +77,7 @@ export default function StatusMonitor({ isConnected, status, violationHistory = 
                                 <span className="text-gray-400 text-sm">Mouth Status</span>
                                 <span className={`font-semibold ${status.mouth_status === 'open' ? 'text-yellow-400' : 'text-green-400'
                                     }`}>
-                                    {status.mouth_status === 'open' ? '👄 Open' : '🤐 Closed'}
+                                    {status.mouth_status === 'open' ? 'Open' : 'Closed'}
                                 </span>
                             </div>
                         </div>
@@ -102,7 +112,6 @@ export default function StatusMonitor({ isConnected, status, violationHistory = 
                                         <span className={`text-sm font-medium flex items-center gap-1.5 ${
                                             isPhone ? 'text-orange-300' : 'text-red-300'
                                         }`}>
-                                            {isPhone ? '📵' : '🚨'}
                                             {violation.alert_type.replace(/_/g, ' ')}
                                         </span>
                                         <span className="text-xs text-gray-500">

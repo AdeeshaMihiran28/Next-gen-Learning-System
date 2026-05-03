@@ -200,24 +200,24 @@ export default function AudioCapture({ isConnected, sendMessage, pushEvent }) {
                         const base64 = dataUrl.split(',')[1];
 
                         // Prefer WebSocket transport if connected
-                        if (isConnected && sendMessage) {
-                            sendMessage({ type: 'audio_chunk', audio: base64, mime: blob.type, timestamp: new Date().toISOString() });
-                        } else {
-                            // Fallback: upload via REST
-                            const fd = new FormData();
-                            fd.append('file', blob, `audio_${Date.now()}.webm`);
-                            try {
-                                const res = await fetch('http://localhost:8000/analyze-audio', {
-                                    method: 'POST',
-                                    body: fd
-                                });
-                                if (res.ok) {
-                                    const json = await res.json();
-                                    setLastTranscript(json.transcript || json.error || '');
-                                }
-                            } catch (err) {
-                                console.error('REST audio upload failed', err);
+                        if (isConnected && sendMessage && sendMessage({ type: 'audio_chunk', audio: base64, mime: blob.type, timestamp: new Date().toISOString() })) {
+                            return;
+                        }
+
+                        // Fallback: upload via REST
+                        const fd = new FormData();
+                        fd.append('file', blob, `audio_${Date.now()}.webm`);
+                        try {
+                            const res = await fetch('http://localhost:8000/analyze-audio', {
+                                method: 'POST',
+                                body: fd
+                            });
+                            if (res.ok) {
+                                const json = await res.json();
+                                setLastTranscript(json.transcript || json.error || '');
                             }
+                        } catch (err) {
+                            console.error('REST audio upload failed', err);
                         }
                     } catch (err) {
                         console.error('Failed to process audio chunk', err);

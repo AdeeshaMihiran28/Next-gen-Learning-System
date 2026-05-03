@@ -12,6 +12,18 @@ export default function AudioAlert({ alert, language = 'en' }) {
         // Don't play audio for ALL_CLEAR alerts
         if (alert.alert_type === 'ALL_CLEAR') return;
 
+        if (alert.alert_type === 'PHONE_DETECTED') {
+            audioPlayer.playAlarm();
+            const message = language === 'si' ? alert.message_si : alert.message_en;
+            const langCode = language === 'si' ? 'si-LK' : 'en-US';
+            if (audioPlayer.supportsTTS()) {
+                window.setTimeout(() => {
+                    audioPlayer.playTTS(message, langCode);
+                }, 950);
+            }
+            return;
+        }
+
         // Determine which message to play
         const message = language === 'si' ? alert.message_si : alert.message_en;
         const langCode = language === 'si' ? 'si-LK' : 'en-US';
