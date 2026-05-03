@@ -76,5 +76,3 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('ACCESS_TOKEN_EXPIRE_MINUTES') 
 MONGO_URI = os.environ.get('MONGO_URI') or "mongodb+srv://Hiruna:Wphd123@cluster0.c7mb8lr.mongodb.net/"
 # Default database name to use when MONGO_URI does not include one
 MONGO_DB = os.environ.get('MONGO_DB') or 'next_gen_smartclassroom'
-
-}
