@@ -2,15 +2,19 @@ import os
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError, ConfigurationError
+from dotenv import load_dotenv
+
+from config import MONGO_DB, MONGO_URI
 
 _client = None
 _db = None
 
 def init_db():
     global _client, _db
+    load_dotenv()
 
-    mongo_uri = os.getenv("MONGO_URI", "").strip()
-    db_name = os.getenv("MONGO_DB_NAME", "ITPM").strip()
+    mongo_uri = (os.getenv("MONGO_URI") or MONGO_URI or "").strip()
+    db_name = (os.getenv("MONGO_DB_NAME") or os.getenv("MONGO_DB") or MONGO_DB or "next_gen_smartclassroom").strip()
 
     if not mongo_uri:
         raise RuntimeError("MONGO_URI is missing in .env")
