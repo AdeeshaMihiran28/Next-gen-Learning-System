@@ -27,9 +27,13 @@ TEMPLATE_DIR = _resolve_env_path("TEMPLATE_DIR", BASE_DIR / "data" / "templates"
 for directory in (UPLOAD_DIR, OUTPUT_DIR, TEMPLATE_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
+_default_cors_origins = "http://localhost:5173,http://127.0.0.1:5173"
+_raw_cors_origins = os.getenv("CORS_ORIGINS")
+_effective_cors_origins = _raw_cors_origins if _raw_cors_origins and _raw_cors_origins.strip() else _default_cors_origins
+
 CORS_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("CORS_ORIGINS", "").split(",")
+    for origin in _effective_cors_origins.split(",")
     if origin.strip()
 ]
 
