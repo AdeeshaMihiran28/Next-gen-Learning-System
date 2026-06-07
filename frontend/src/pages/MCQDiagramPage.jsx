@@ -68,6 +68,13 @@ export default function MCQDiagramPage() {
         setAttempt(null);
       }
     } catch (e) {
+      if (e.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("userRole");
+        navigate("/login", { replace: true });
+        return;
+      }
       setError(e.message || "Failed to load assignment");
     } finally {
       setLoading(false);

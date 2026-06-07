@@ -55,6 +55,61 @@ function fmtTime(ts) {
 }
 
 /* ─── Stat Card ─── */
+const CHEATING_SPEECH_PHRASES = [
+    'please give me answer',
+    'please give me the answer',
+    'give me answer',
+    'give me the answer',
+    'tell me answer',
+    'tell me the answer',
+    'show me answer',
+    'show me the answer',
+    'send me answer',
+    'send me the answer',
+    'say answer',
+    'say the answer',
+    'help me answer',
+    'help me with answer',
+    'what is the answer',
+    'whats the answer',
+    'search the answer',
+    'google the answer',
+    'ask chatgpt',
+    'check chatgpt',
+];
+
+function normalizeSpeechText(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function fallbackIntentFromTranscript(transcript) {
+    const text = normalizeSpeechText(transcript);
+    if (!text) return null;
+
+    const match = CHEATING_SPEECH_PHRASES.find((phrase) => text.includes(phrase));
+    if (!match) return null;
+
+    return {
+        intent: 'CHEATING',
+        matches: [match],
+        score: 0.95,
+        source: 'local_fallback',
+    };
+}
+
+function effectiveIntent(data) {
+    const saved = data?.intent || null;
+    const fallback = fallbackIntentFromTranscript(data?.transcript);
+    if (fallback && saved?.intent !== 'CHEATING') {
+        return fallback;
+    }
+    return saved;
+}
+
 function StatCard({ icon, label, value, color = '#06b6d4' }) {
     return (
         <div style={{
@@ -97,7 +152,33 @@ function StudentDetailModal({ session, onClose }) {
 
     if (!session) return null;
 
-    const violations = (detail?.events || []).filter(e => e.event_type === 'violation');
+    const existingViolations = (detail?.events || []).filter(e => e.event_type === 'violation');
+    const transcriptIntentViolations = (detail?.events || []).filter(e => {
+        if (e.event_type !== 'transcript') return false;
+        const intent = effectiveIntent(e.data)?.intent;
+        const transcript = e.data?.transcript;
+        const alreadyRecorded = existingViolations.some((violation) =>
+            violation.data?.alert_type === 'CHEATING_SUSPECTED'
+            && transcript
+            && violation.data?.transcript === transcript
+        );
+        return !alreadyRecorded && (intent === 'CHEATING' || intent === 'SUSPICIOUS');
+    }).map(e => ({
+        ...e,
+        event_type: 'violation',
+        data: {
+            ...(e.data || {}),
+            alert_type: 'CHEATING_SUSPECTED',
+            severity: effectiveIntent(e.data)?.intent === 'CHEATING' ? 'critical' : 'warning',
+            message_en: effectiveIntent(e.data)?.intent === 'CHEATING'
+                ? 'Cheating speech detected from transcript meaning'
+                : 'Suspicious speech detected from transcript meaning',
+        },
+    }));
+    const violations = [
+        ...existingViolations,
+        ...transcriptIntentViolations,
+    ];
     const noFace = (detail?.events || []).filter(e => e.event_type === 'no_face');
     // Only show transcripts that have actual speech text or an error
     const transcripts = (detail?.events || []).filter(e => {
@@ -329,6 +410,7 @@ function EventCard({ event }) {
 
 function TranscriptCard({ event }) {
     const d = event.data || {};
+    const intent = effectiveIntent(d);
     return (
         <div style={{
             padding: '20px 24px', borderRadius: 16,
@@ -362,24 +444,24 @@ function TranscriptCard({ event }) {
             </div>
 
             {/* Intent / Meaning Analysis */}
-            {d.intent && (
+            {intent && (
                 <div style={{
                     padding: '14px 18px', borderRadius: 12,
                     background: 'rgba(0,0,0,.1)', border: '1px solid rgba(255,255,255,.04)'
                 }}>
                     <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8, fontWeight: 600, letterSpacing: .5 }}>MEANING & INTENT ANALYSIS</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                        {intentBadge(d.intent.intent)}
-                        {d.intent.score != null && (
+                        {intentBadge(intent.intent)}
+                        {intent.score != null && (
                             <span style={{ fontSize: 12, color: '#94a3b8' }}>
-                                Confidence: <strong style={{ color: 'var(--text-primary)' }}>{(d.intent.score * 100).toFixed(0)}%</strong>
+                                Confidence: <strong style={{ color: 'var(--text-primary)' }}>{(intent.score * 100).toFixed(0)}%</strong>
                             </span>
                         )}
                     </div>
-                    {d.intent.matches && d.intent.matches.length > 0 && (
+                    {intent.matches && intent.matches.length > 0 && (
                         <div style={{ marginTop: 6 }}>
                             <span style={{ fontSize: 11, color: '#64748b' }}>Matched keywords: </span>
-                            {d.intent.matches.map((m, i) => (
+                            {intent.matches.map((m, i) => (
                                 <span key={i} style={{
                                     display: 'inline-block', padding: '2px 8px', borderRadius: 6,
                                     background: 'rgba(239,68,68,.1)', color: '#f87171',
@@ -390,7 +472,7 @@ function TranscriptCard({ event }) {
                             ))}
                         </div>
                     )}
-                    {d.intent.intent === 'CHEATING' && (
+                    {intent.intent === 'CHEATING' && (
                         <div style={{
                             marginTop: 10, padding: '8px 12px', borderRadius: 8,
                             background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.15)',
@@ -399,7 +481,7 @@ function TranscriptCard({ event }) {
                             ⚡ <strong>Cheating Detected:</strong> The student's speech contains keywords strongly indicating they were seeking answers or assistance from others.
                         </div>
                     )}
-                    {d.intent.intent === 'SUSPICIOUS' && (
+                    {intent.intent === 'SUSPICIOUS' && (
                         <div style={{
                             marginTop: 10, padding: '8px 12px', borderRadius: 8,
                             background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.15)',
@@ -408,7 +490,7 @@ function TranscriptCard({ event }) {
                             🔍 <strong>Suspicious Activity:</strong> The student may have been looking for hints or external assistance.
                         </div>
                     )}
-                    {d.intent.intent === 'NORMAL' && (
+                    {intent.intent === 'NORMAL' && (
                         <div style={{
                             marginTop: 10, padding: '8px 12px', borderRadius: 8,
                             background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.15)',
@@ -431,6 +513,7 @@ function TranscriptCard({ event }) {
 
 function TimelineItem({ event }) {
     const d = event.data || {};
+    const intent = effectiveIntent(d);
     const icons = { violation: '⚠️', no_face: '👤', transcript: '🎙️' };
     const colors = { violation: '#ef4444', no_face: '#f59e0b', transcript: '#8b5cf6' };
     const c = colors[event.event_type] || '#6b7280';
@@ -454,9 +537,9 @@ function TimelineItem({ event }) {
                 </div>
                 {d.message_en && <div style={{ fontSize: 12, color: '#94a3b8' }}>{d.message_en}</div>}
                 {d.transcript && <div style={{ fontSize: 12, color: '#c4b5fd', marginTop: 4 }}>"{d.transcript}"</div>}
-                {d.intent && (
+                {intent && (
                     <div style={{ marginTop: 6 }}>
-                        {intentBadge(d.intent.intent)}
+                        {intentBadge(intent.intent)}
                     </div>
                 )}
             </div>

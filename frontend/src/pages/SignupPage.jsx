@@ -4,7 +4,9 @@ import { useNavigate, Link } from 'react-router-dom';
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 
 export default function SignupPage() {
+    const [fullName, setFullName] = useState('');
     const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [role, setRole] = useState('student');
     const [error, setError] = useState('');
@@ -40,11 +42,12 @@ export default function SignupPage() {
             }
 
             const data = await loginRes.json();
+            const userProfile = { ...data.user, fullName, email };
             localStorage.setItem('token', data.access_token);
-            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('user', JSON.stringify(userProfile));
             localStorage.setItem('userRole', data.user.role);
 
-            navigate(data.user.role === 'admin' ? '/admin' : '/student');
+            navigate('/home');
             window.location.reload();
         } catch (ex) {
             setError(String(ex));
@@ -52,29 +55,115 @@ export default function SignupPage() {
     };
 
     return (
-        <div className="max-w-md mx-auto p-6">
-            <h1 className="text-2xl font-bold mb-4">Create an account</h1>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                {error && <div className="text-sm text-red-500">{error}</div>}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Username</label>
-                    <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="choose a username" className="mt-1 block w-full rounded-md border-gray-200 p-2" />
+        <div className="min-h-[calc(100vh-160px)] bg-slate-50 dark:bg-gray-950 px-4 py-10 transition-colors duration-300">
+            <form
+                onSubmit={handleSubmit}
+                className="mx-auto w-full max-w-xl rounded-[32px] bg-white px-6 py-8 shadow-2xl shadow-slate-200/80 ring-1 ring-slate-200 dark:bg-gray-900 dark:shadow-black/30 dark:ring-gray-800 sm:px-10"
+            >
+                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-500 text-3xl shadow-xl shadow-cyan-300/50">
+                    🎓
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="choose a password" className="mt-1 block w-full rounded-md border-gray-200 p-2" />
+
+                <div className="mb-8 text-center">
+                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+                        Create Account
+                    </h1>
+                    <p className="mt-3 text-base text-slate-600 dark:text-slate-300">
+                        Join the Next Gen Learning Smart Classroom - NGLSC
+                    </p>
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Role</label>
-                    <select value={role} onChange={(e) => setRole(e.target.value)} className="mt-1 block w-full rounded-md border-gray-200 p-2">
-                        <option value="student">Student</option>
-                        <option value="admin">Admin</option>
-                    </select>
+
+                {error && (
+                    <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+                        {error}
+                    </div>
+                )}
+
+                <div className="space-y-5">
+                    <label className="block">
+                        <span className="text-base font-semibold text-slate-800 dark:text-slate-100">Full Name</span>
+                        <input
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                            placeholder="Enter your full name"
+                            className="mt-2 block h-14 w-full rounded-xl border border-slate-200 bg-slate-950 px-4 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100 dark:border-gray-700 dark:bg-gray-950 dark:focus:ring-cyan-950"
+                        />
+                    </label>
+
+                    <label className="block">
+                        <span className="text-base font-semibold text-slate-800 dark:text-slate-100">Username</span>
+                        <input
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="Choose a username"
+                            className="mt-2 block h-14 w-full rounded-xl border border-slate-200 bg-slate-950 px-4 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100 dark:border-gray-700 dark:bg-gray-950 dark:focus:ring-cyan-950"
+                        />
+                    </label>
+
+                    <label className="block">
+                        <span className="text-base font-semibold text-slate-800 dark:text-slate-100">Email Address</span>
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="email@example.com"
+                            className="mt-2 block h-14 w-full rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:ring-cyan-950"
+                        />
+                    </label>
+
+                    <label className="block">
+                        <span className="text-base font-semibold text-slate-800 dark:text-slate-100">Password</span>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Create a secure password"
+                            className="mt-2 block h-14 w-full rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:ring-cyan-950"
+                        />
+                    </label>
+
+                    <fieldset>
+                        <legend className="text-base font-semibold text-slate-800 dark:text-slate-100">I am a...</legend>
+                        <div className="mt-3 grid grid-cols-2 gap-4">
+                            <button
+                                type="button"
+                                onClick={() => setRole('student')}
+                                className={`h-14 rounded-xl text-base font-extrabold transition ${
+                                    role === 'student'
+                                        ? 'bg-cyan-50 text-cyan-900 shadow-sm ring-1 ring-cyan-100 dark:bg-cyan-950/40 dark:text-cyan-200 dark:ring-cyan-900'
+                                        : 'bg-white text-slate-600 ring-1 ring-transparent hover:bg-slate-50 dark:bg-gray-900 dark:text-slate-300 dark:hover:bg-gray-800'
+                                }`}
+                            >
+                                👨‍🎓 Student
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setRole('admin')}
+                                className={`h-14 rounded-xl text-base font-extrabold transition ${
+                                    role === 'admin'
+                                        ? 'bg-cyan-50 text-cyan-900 shadow-sm ring-1 ring-cyan-100 dark:bg-cyan-950/40 dark:text-cyan-200 dark:ring-cyan-900'
+                                        : 'bg-white text-slate-600 ring-1 ring-transparent hover:bg-slate-50 dark:bg-gray-900 dark:text-slate-300 dark:hover:bg-gray-800'
+                                }`}
+                            >
+                                👨‍🏫 Admin
+                            </button>
+                        </div>
+                    </fieldset>
                 </div>
-                <div className="flex items-center gap-3">
-                    <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-md">Create account</button>
-                    <Link to="/login" className="text-sm text-gray-600">Already have an account?</Link>
-                </div>
+
+                <button
+                    type="submit"
+                    className="mt-7 h-14 w-full rounded-xl bg-cyan-500 text-base font-extrabold text-white shadow-xl shadow-cyan-300/50 transition hover:bg-cyan-600 focus:outline-none focus:ring-4 focus:ring-cyan-100 dark:shadow-cyan-950/40 dark:focus:ring-cyan-950"
+                >
+                    Create Account
+                </button>
+
+                <p className="mt-7 text-center text-base text-slate-600 dark:text-slate-300">
+                    Already have an account?{' '}
+                    <Link to="/login" className="font-extrabold text-cyan-600 hover:text-cyan-700 dark:text-cyan-400">
+                        Sign in here
+                    </Link>
+                </p>
             </form>
         </div>
     );
