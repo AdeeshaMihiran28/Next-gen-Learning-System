@@ -1,6 +1,16 @@
-﻿import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import ThemeToggle from './ThemeToggle';
+
+function getInitials(name) {
+    const value = String(name || 'User').trim();
+    if (!value) return 'U';
+    const parts = value.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) {
+        return parts[0].slice(0, 2).toUpperCase();
+    }
+    return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
+}
 
 function Header() {
     const location = useLocation();
@@ -49,49 +59,66 @@ function Header() {
         : (isHomePage ? studentLinks.filter((link) => link.path === '/home') : studentLinks);
 
     const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
+    const displayName = user?.full_name || user?.name || user?.username || 'User';
+    const roleLabel = role === 'admin' ? 'Admin' : 'Student';
+    const avatarTone = role === 'admin'
+        ? 'from-violet-500 to-fuchsia-500'
+        : 'from-cyan-500 to-blue-500';
+    const profilePath = role === 'admin' ? '/admin' : '/student';
 
     return (
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 backdrop-blur-xl sticky top-0 z-50 shadow-sm transition-colors duration-300">
-            <div className="px-4 sm:px-6 py-3">
+        <header className="sticky top-0 z-50 border-b border-gray-200 bg-white shadow-sm backdrop-blur-xl transition-colors duration-300 dark:border-gray-700 dark:bg-gray-800">
+            <div className="px-4 py-3 sm:px-6">
                 <div className="flex items-center justify-between">
-                    <Link to="/home" className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-300">
+                    <Link to="/home" className="flex items-center gap-2 transition-opacity duration-300 hover:opacity-80">
                         <div className="text-2xl sm:text-3xl">{'\u{1F393}'}</div>
                         <div>
-                            <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white transition-colors duration-300">
+                            <h1 className="text-base font-bold text-gray-900 transition-colors duration-300 dark:text-white sm:text-lg">
                                 AI Proctoring & Learning System
                             </h1>
-                            <p className="text-gray-600 dark:text-gray-400 text-xs mt-0.5 transition-colors duration-300 hidden sm:block">
+                            <p className="mt-0.5 hidden text-xs text-gray-600 transition-colors duration-300 dark:text-gray-400 sm:block">
                                 Exam Monitoring & Lecture Recording
                             </p>
                         </div>
                     </Link>
 
-                    <nav className="flex gap-2 items-center">
+                    <nav className="flex items-center gap-2">
                         {navLinks.map((link) => (
                             <Link
                                 key={link.path}
                                 to={link.path}
-                                className={`group relative overflow-hidden px-3.5 sm:px-4.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 hover:-translate-y-0.5 ${isActive(link.path)
+                                className={`group relative flex items-center gap-2 overflow-hidden rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 sm:px-4.5 ${isActive(link.path)
                                     ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/30 ring-1 ring-cyan-300/20'
-                                    : 'bg-gray-100 dark:bg-gray-700/40 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600/40 hover:bg-white dark:hover:bg-gray-600/60 hover:text-gray-900 dark:hover:text-white hover:shadow-md'
+                                    : 'border border-gray-200 bg-gray-100 text-gray-700 hover:bg-white hover:text-gray-900 hover:shadow-md dark:border-gray-600/40 dark:bg-gray-700/40 dark:text-gray-300 dark:hover:bg-gray-600/60 dark:hover:text-white'
                                     }`}
                             >
                                 <span className={`text-base transition-transform duration-300 ${isActive(link.path) ? '' : 'group-hover:scale-110'}`}>{link.icon}</span>
-                                <span className="hidden md:inline text-sm tracking-tight">{link.label}</span>
+                                <span className="hidden text-sm tracking-tight md:inline">{link.label}</span>
                             </Link>
                         ))}
 
                         <ThemeToggle />
 
                         {user ? (
-                            <div className="flex items-center gap-2 ml-2">
-                                <div className="text-sm text-gray-600 dark:text-gray-300 pr-2">{user.username} ({role})</div>
-                                <button onClick={handleLogout} className="px-3 py-1 bg-red-500 text-white rounded-md text-sm">Logout</button>
+                            <div className="ml-2 flex items-center gap-2">
+                                <Link
+                                    to={profilePath}
+                                    title={`${displayName} (${roleLabel})`}
+                                    aria-label={`${displayName} ${roleLabel}`}
+                                    className="flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 transition hover:border-cyan-300 hover:bg-white dark:border-gray-700 dark:bg-gray-900/80 dark:hover:border-cyan-700 dark:hover:bg-gray-900"
+                                >
+                                    <div className={`flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br ${avatarTone} text-sm font-extrabold text-white shadow-lg`}>
+                                        {getInitials(displayName)}
+                                    </div>
+                                </Link>
+                                <button onClick={handleLogout} className="rounded-md bg-red-500 px-3 py-1 text-sm text-white">
+                                    Logout
+                                </button>
                             </div>
                         ) : (
-                            <div className="flex items-center gap-2 ml-2">
-                                <Link to="/login" className="px-3 py-1 bg-cyan-500 text-white rounded-md text-sm">Login</Link>
-                                <Link to="/signup" className="px-3 py-1 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 rounded-md text-sm">Sign up</Link>
+                            <div className="ml-2 flex items-center gap-2">
+                                <Link to="/login" className="rounded-md bg-cyan-500 px-3 py-1 text-sm text-white">Login</Link>
+                                <Link to="/signup" className="rounded-md bg-gray-100 px-3 py-1 text-sm text-gray-700 dark:bg-gray-700/50 dark:text-gray-300">Sign up</Link>
                             </div>
                         )}
                     </nav>

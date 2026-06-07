@@ -1099,6 +1099,12 @@ function SummarySection({ title, content }) {
 }
 
 function formatSummaryObject(value) {
+  if (value && typeof value === "object" && "time_range" in value && "summary" in value) {
+    return `${value.time_range}: ${value.summary}`;
+  }
+  if (value && typeof value === "object" && "term" in value && "definition" in value) {
+    return `${value.term}: ${value.definition}`;
+  }
   return Object.entries(value)
     .filter(([key]) => key !== "time_range")
     .map(([key, item]) => `${key}: ${String(item)}`)
