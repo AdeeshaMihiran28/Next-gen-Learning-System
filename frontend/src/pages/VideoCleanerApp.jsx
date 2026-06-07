@@ -446,12 +446,6 @@ function UploadPage() {
 
                 {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
               </form>
-
-              <EmbeddedLectureGallery
-                galleryItems={galleryItems}
-                isLoadingGallery={isLoadingGallery}
-                onDeleted={(jobId) => setGalleryItems((current) => current.filter((entry) => entry.job_id !== jobId))}
-              />
             </>
           )}
 
