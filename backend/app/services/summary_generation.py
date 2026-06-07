@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -130,16 +131,27 @@ def build_structured_summary(
     final_summary: str,
 ) -> dict[str, Any]:
     """Build a structured summary payload from generated chunk summaries."""
-    overview = _clean_transcript_text(final_summary).strip()
+    cleaned_chunk_summaries = [
+        _strip_time_prefix(_clean_transcript_text(summary)).strip()
+        for summary in chunk_summaries
+        if _strip_time_prefix(_clean_transcript_text(summary)).strip()
+    ]
+    combined_source = " ".join([final_summary, *cleaned_chunk_summaries]).strip()
+
+    source_sentences = _extract_sentences(_clean_transcript_text(combined_source))
+    overview_sentences = _select_useful_sentences(source_sentences, limit=4)
+    overview = " ".join(overview_sentences).strip() or _clean_transcript_text(final_summary).strip()
+
     summary_sentences = _extract_sentences(overview)
-    topic_candidates = _build_key_topics(overview, chunk_summaries)
-    takeaways = _build_takeaways(summary_sentences, topic_candidates)
+    topic_candidates = _build_key_topics(overview, cleaned_chunk_summaries)
+    takeaways = _build_takeaways(source_sentences, topic_candidates)
+    definitions = _extract_definitions(combined_source)[:4]
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "overview": overview,
-        "key_topics": topic_candidates[:5],
-        "definitions": _extract_definitions(overview)[:5],
+        "key_topics": topic_candidates[:6],
+        "definitions": definitions,
         "takeaways": takeaways[:5],
         "outline": [
             _strip_time_prefix(_clean_transcript_text(chunk_summary)).strip()
@@ -168,7 +180,7 @@ def _extract_definitions(text: str) -> list[dict[str, str]]:
         if _is_low_value_sentence(sentence):
             continue
         match = re.match(
-            r"(?P<term>[A-Z][A-Za-z0-9\s/-]{1,40})\s+(?:is|are|refers to|means)\s+(?P<definition>.+)",
+            r"(?P<term>[A-Z][A-Za-z0-9\s/-]{1,50})\s+(?:is|are|refers to|means)\s+(?P<definition>.+)",
             sentence,
         )
         if match is None:
@@ -176,7 +188,7 @@ def _extract_definitions(text: str) -> list[dict[str, str]]:
 
         term = match.group("term").strip()
         definition = match.group("definition").strip()
-        if len(term.split()) > 4 or len(definition.split()) < 4:
+        if len(term.split()) > 5 or len(definition.split()) < 4:
             continue
 
         definitions.append(
@@ -217,8 +229,16 @@ def _format_timestamp(seconds: float) -> str:
 
 
 def _clean_transcript_text(text: str) -> str:
-    cleaned = re.sub(r"\b(\w+)(?:\s+\1\b){2,}", r"\1", text, flags=re.IGNORECASE)
+    cleaned = re.sub(
+        r"\b\d{2}:\d{2}(?::\d{2})?\s*-\s*\d{2}:\d{2}(?::\d{2})?\s*:?",
+        " ",
+        text,
+    )
+    cleaned = re.sub(r"\b\d{2}:\d{2}(?::\d{2})?\b", " ", cleaned)
+    cleaned = re.sub(r"\b([a-z]{1,3})(?:\s+\1\b){2,}", r"\1", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(\w+)(?:\s+\1\b){2,}", r"\1", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\b(you|um|uh|okay|ok)\b(?:\s+\b\1\b)+", r"\1", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*[-–]\s*", " - ", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned
 
@@ -229,29 +249,47 @@ def _strip_time_prefix(text: str) -> str:
 
 def _is_low_value_sentence(sentence: str) -> bool:
     normalized = sentence.strip().casefold()
-    if len(normalized.split()) < 5:
+    words = normalized.split()
+    if len(words) < 5:
+        return True
+    alpha_chars = sum(ch.isalpha() for ch in normalized)
+    if alpha_chars < max(12, int(len(normalized) * 0.45)):
+        return True
+    if len(set(words)) <= 2:
         return True
     low_value_phrases = {
         "i have flashed my screen",
+        "i hope you can see it properly",
+        "hope you can see it properly",
+        "you know",
         "okay",
     }
-    return normalized in low_value_phrases
+    return normalized in low_value_phrases or any(phrase in normalized for phrase in low_value_phrases)
 
 
 def _select_useful_sentences(sentences: list[str], *, limit: int) -> list[str]:
-    useful = [
-        sentence
-        for sentence in sentences
-        if not _is_low_value_sentence(sentence)
-    ]
-    return useful[:limit]
+    scored: list[tuple[float, int, str]] = []
+    for index, sentence in enumerate(sentences):
+        if _is_low_value_sentence(sentence):
+            continue
+        score = _sentence_score(sentence)
+        if score <= 0:
+            continue
+        scored.append((score, index, sentence))
+
+    top = sorted(scored, key=lambda item: (-item[0], item[1]))[:limit]
+    ordered = [sentence for _, _, sentence in sorted(top, key=lambda item: item[1])]
+    return ordered
 
 
 def _build_key_topics(overview: str, chunk_summaries: list[str]) -> list[str]:
-    source_sentences = _extract_sentences(
-        " ".join([overview, *(_strip_time_prefix(summary) for summary in chunk_summaries)])
-    )
-    candidates = _select_useful_sentences(source_sentences, limit=8)
+    source_text = " ".join([overview, *(_strip_time_prefix(summary) for summary in chunk_summaries)])
+    phrases = _extract_topic_phrases(source_text)
+    if phrases:
+        return phrases
+
+    source_sentences = _extract_sentences(source_text)
+    candidates = _select_useful_sentences(source_sentences, limit=6)
     return _dedupe_preserve_order(candidates)
 
 
@@ -260,3 +298,60 @@ def _build_takeaways(summary_sentences: list[str], topic_candidates: list[str]) 
     if candidates:
         return candidates
     return topic_candidates[:3]
+
+
+def _sentence_score(sentence: str) -> float:
+    text = sentence.strip()
+    words = re.findall(r"[A-Za-z][A-Za-z0-9'-]*", text)
+    if len(words) < 5:
+        return 0.0
+
+    score = min(len(words), 22) / 22
+    if 6 <= len(words) <= 24:
+        score += 0.8
+    if re.search(r"\b(is|are|means|refers to|helps|supports|improves|build|develop|lead|manage)\b", text, re.IGNORECASE):
+        score += 0.5
+    if re.search(r"\b(team|leadership|leader|database|sql|system|process|goal|achievement|management)\b", text, re.IGNORECASE):
+        score += 0.4
+    if text.endswith("?"):
+        score -= 0.8
+    return score
+
+
+_TOPIC_STOPWORDS = {
+    "the", "and", "for", "with", "that", "this", "from", "into", "about",
+    "your", "their", "there", "have", "been", "being", "will", "would",
+    "could", "should", "what", "when", "where", "which", "while", "hope",
+    "screen", "properly", "need", "good", "going", "discuss", "discussion",
+}
+
+
+def _extract_topic_phrases(text: str) -> list[str]:
+    tokens = [
+        token.casefold()
+        for token in re.findall(r"[A-Za-z][A-Za-z0-9'-]*", text)
+        if len(token) > 2
+    ]
+    tokens = [token for token in tokens if token not in _TOPIC_STOPWORDS]
+    if not tokens:
+        return []
+
+    phrase_counter: Counter[str] = Counter()
+    for size in (3, 2, 1):
+        for index in range(len(tokens) - size + 1):
+            phrase = " ".join(tokens[index:index + size])
+            if any(part in _TOPIC_STOPWORDS for part in phrase.split()):
+                continue
+            phrase_counter[phrase] += 1
+
+    ranked: list[str] = []
+    for phrase, count in phrase_counter.most_common(20):
+        if count < 2 and len(phrase.split()) == 1:
+            continue
+        pretty = phrase.upper() if phrase == "sql" else phrase.title()
+        if any(phrase in existing.casefold() or existing.casefold() in phrase for existing in ranked):
+            continue
+        ranked.append(pretty)
+        if len(ranked) >= 6:
+            break
+    return ranked
