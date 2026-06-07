@@ -8,6 +8,7 @@ import QuizConfigScreen from './components/QuizConfigScreen';
 import QuizComponent from './components/QuizComponent';
 import QuizResults from './components/QuizResults';
 import ProctoringWidget from './components/ProctoringWidget';
+import ProtectedRoute from './components/ProtectedRoute';
 import LectureRecorderPage from './pages/LectureRecorderPage';
 import ExamAnalysisPage from './pages/ExamAnalysisPage';
 import LoginPage from './pages/LoginPage';
@@ -19,8 +20,7 @@ import SmartAttendersPage from './pages/SmartAttendersPage';
 import MCQDiagramPage from './pages/MCQDiagramPage';
 import VoiceQuizPage from './pages/VoiceQuizPage';
 import VoiceQuizResults from './pages/VoiceQuizResults';
-import VideoCleanerApp from './VideoCleanerApp.jsx';
-import './App.css';
+import VideoCleanerApp from './pages/VideoCleanerApp.jsx';
 
 // Main quiz app component
 function QuizApp() {
@@ -218,7 +218,10 @@ function MainApp() {
                     {/* Dashboards */}
                     <Route path="/admin" element={<Layout><AdminDashboard /></Layout>} />
                     <Route path="/student" element={<Layout><StudentDashboard /></Layout>} />
-                    <Route path="/mcq-diagrams" element={<Layout><MCQDiagramPage /></Layout>} />
+                    <Route
+                        path="/mcq-diagrams"
+                        element={<ProtectedRoute><Layout><MCQDiagramPage /></Layout></ProtectedRoute>}
+                    />
                     <Route path="/voice-quiz" element={<Layout><VoiceQuizPage /></Layout>} />
                     <Route path="/voice-quiz-results" element={<Layout><VoiceQuizResults /></Layout>} />
                     <Route path="/lecture-recorder" element={<Layout><LectureRecorderPage /></Layout>} />
