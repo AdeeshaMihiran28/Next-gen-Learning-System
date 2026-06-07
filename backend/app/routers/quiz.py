@@ -454,7 +454,18 @@ def submit_quiz(body: QuizSubmitIn, user=Depends(get_current_user)):
 
     sess = sessions.find_one({"_id": _id, "user_id": user["id"]})
     if not sess:
-        raise HTTPException(status_code=404, detail="session not found")
+        sess = sessions.find_one({"_id": _id})
+        if not sess:
+            raise HTTPException(status_code=404, detail="session not found")
+        if sess.get("user_id") and sess.get("user_id") != user["id"]:
+            # Older local sessions may have been created before auth switched
+            # backends. Attach the currently logged-in user so submit works too.
+            sessions.update_one(
+                {"_id": _id},
+                {"$set": {"user_id": user["id"], "user_email": user.get("email")}},
+            )
+            sess["user_id"] = user["id"]
+            sess["user_email"] = user.get("email")
 
     answers_fixed = _ensure_topics_in_answers(body.answers, sess.get("questions") or [])
 

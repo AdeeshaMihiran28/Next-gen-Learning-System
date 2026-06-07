@@ -32,9 +32,11 @@ import os
 import re
 import json
 import tempfile
+import shutil
 from datetime import datetime
 import subprocess
 import difflib
+from pathlib import Path
 
 from flask import Flask, request, jsonify
 import pandas as pd
@@ -621,12 +623,45 @@ def _load_voice_model():
         VOICE_LE = None
 
 # Function to get YAMNet model
+def _prune_invalid_tfhub_cache() -> None:
+    cache_root = os.environ.get("TFHUB_CACHE_DIR")
+    if cache_root:
+        root = Path(cache_root)
+    else:
+        root = Path(tempfile.gettempdir()) / "tfhub_modules"
+
+    if not root.exists():
+        return
+
+    for child in root.iterdir():
+        if not child.is_dir():
+            continue
+        has_saved_model = (child / "saved_model.pb").exists() or (child / "saved_model.pbtxt").exists()
+        if has_saved_model:
+            continue
+        # Broken partial TF Hub download/cache entry. Remove it so hub can re-fetch.
+        try:
+            shutil.rmtree(child)
+            print(f"[VOICE] Removed invalid TF Hub cache: {child}")
+        except Exception as e:
+            print(f"[VOICE] Could not remove invalid TF Hub cache '{child}': {e}")
+
+
 def _get_yamnet():
     global _YAMNET_MODEL
     if _YAMNET_MODEL is None:
         import tensorflow_hub as hub
         print(f"[VOICE] Loading YAMNet from TF Hub: {YAMNET_HANDLE}")
-        _YAMNET_MODEL = hub.load(YAMNET_HANDLE)
+        try:
+            _YAMNET_MODEL = hub.load(YAMNET_HANDLE)
+        except Exception as e:
+            err_text = str(e)
+            if "saved_model.pb" in err_text or "saved_model.pbtxt" in err_text:
+                print("[VOICE] Detected broken TF Hub cache entry. Pruning invalid cache and retrying once.")
+                _prune_invalid_tfhub_cache()
+                _YAMNET_MODEL = hub.load(YAMNET_HANDLE)
+            else:
+                raise
     return _YAMNET_MODEL
 
 # Function to extract YAMNet embeddings
@@ -1152,8 +1187,10 @@ def grade_voice():
 
         raw_transcript = transcribe_audio_from_path(wav_path, initial_prompt=whisper_prompt)
         voice_conf = predict_voice_confidence(wav_path)
-    except Exception as e:
+    except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
     finally:
         for p in {tmp_path, wav_path}:
             if not p:
@@ -1228,8 +1265,10 @@ def voice_confidence_route():
         tmp_path = save_uploaded_audio(audio_file)
         wav_path = ensure_wav(tmp_path)
         voice_conf = predict_voice_confidence(wav_path)
-    except Exception as e:
+    except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
     finally:
         for p in {tmp_path, wav_path}:
             if not p:
