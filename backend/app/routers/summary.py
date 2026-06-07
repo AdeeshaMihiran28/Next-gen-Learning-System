@@ -60,7 +60,7 @@ async def get_summary_json(job_id: str) -> JSONResponse:
 
 def _get_job_or_404(job_id: str) -> Job:
     job = JobStore.get(job_id)
-    if job is None:
+    if job is None and existing_summary_path(job_id, "summary.json") is None and existing_summary_path(job_id, "summary.pdf") is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     return job
 

@@ -1,4 +1,4 @@
-from intent_analyzer import analyze_transcript
+from app.services.intent_analyzer import analyze_transcript
 
 
 def test_answer_request_without_the_is_cheating():

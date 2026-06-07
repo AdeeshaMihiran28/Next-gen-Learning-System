@@ -4,6 +4,7 @@ FastAPI WebSocket server for real-time exam proctoring
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.wsgi import WSGIMiddleware
 import cv2
 import numpy as np
 import base64
@@ -12,17 +13,29 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from proctoring_engine import ProctoringEngine
-from models import AlertEvent, FrameData
-from quiz_generator import generate_quiz, QuizConfig, QuizResponse
-from audio_processor import process_audio_bytes
+from app.services.proctoring_engine import ProctoringEngine
+from app.schemas.proctoring import AlertEvent, FrameData
+from app.services.quiz_generator import generate_quiz, QuizConfig, QuizResponse
+from app.services.audio_processor import process_audio_bytes
 import asyncio
-import auth
-import exam_sessions
+from app.routers import auth as auth_routes
+from app.routers import exam_sessions as exam_sessions_routes
+from app.core.db import init_db
+from app.routers.mcq_assignment import router as mcq_assignment_router
+from app.services.mcq_diagram import create_mcq_diagram_app
+from app.routers.quiz import router as voice_quiz_router
+from app.services.voice_app import voice_app
+from app.routers import artifacts as cleaner_artifacts
+from app.routers import jobs as cleaner_jobs
+from app.routers import summary as cleaner_summary
+from app.routers import templates as cleaner_templates
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+PROCTORING_AUDIO_STT_ENABLED = os.environ.get("PROCTORING_AUDIO_STT", "0").lower() in {"1", "true", "yes", "on"}
+BASE_DIR = Path(__file__).resolve().parent
+MODELS_DIR = BASE_DIR / "assets" / "models"
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -32,18 +45,46 @@ app = FastAPI(
 )
 
 # Register auth routes
-app.include_router(auth.router)
+app.include_router(auth_routes.router)
 
 # Register exam session routes
-app.include_router(exam_sessions.router)
+app.include_router(exam_sessions_routes.router)
+
+# Register MCQ & Diagrams routes and ML helper app
+app.include_router(mcq_assignment_router)
+app.mount("/ml", WSGIMiddleware(create_mcq_diagram_app(models_dir=str(MODELS_DIR))))
+
+# Register Voice Answer routes and ICT grading helper app
+app.include_router(voice_quiz_router)
+app.mount("/ict", WSGIMiddleware(voice_app))
+
+# Register Video Cleaner routes
+for cleaner_router in (
+    cleaner_jobs.router,
+    cleaner_templates.router,
+    cleaner_artifacts.router,
+    cleaner_summary.router,
+):
+    app.include_router(cleaner_router)
 
 
 @app.on_event("startup")
 async def startup_event():
     try:
-        await auth.init_db_async()
+        await auth_routes.init_db_async()
     except Exception as e:
         logger.exception("Auth DB initialization failed")
+    try:
+        init_db()
+        logger.info("MongoDB initialized for MCQ & Diagrams")
+    except Exception:
+        logger.exception("MCQ & Diagrams DB initialization failed")
+    voice_routes = [
+        route.path
+        for route in app.routes
+        if getattr(route, "path", "") in {"/api/quiz/answered-ids", "/api/quiz/start", "/ict"}
+    ]
+    logger.info("Voice Answer routes registered: %s", ", ".join(voice_routes) or "none")
 
 # CORS middleware for frontend communication
 app.add_middleware(
@@ -81,7 +122,7 @@ async def health():
 
 
 # Lecture gallery directory
-LECTURE_GALLERY_DIR = Path("lecture_gallery")
+LECTURE_GALLERY_DIR = BASE_DIR / "data" / "lecture_gallery"
 LECTURE_GALLERY_DIR.mkdir(exist_ok=True)
 
 
@@ -296,6 +337,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 # AUDIO message handling (preferred): { type: 'audio_chunk', audio: '<base64>' }
                 if frame_data.get("type") == "audio_chunk" or "audio" in frame_data:
+                    if not PROCTORING_AUDIO_STT_ENABLED:
+                        continue
+
                     try:
                         audio_b64 = frame_data.get("audio") or frame_data.get("frame")
                         if not audio_b64:
@@ -308,6 +352,8 @@ async def websocket_endpoint(websocket: WebSocket):
                         async def _handle_audio(bytes_data):
                             try:
                                 result = await process_audio_bytes(bytes_data, suffix=".webm")
+                                if result.get("skipped"):
+                                    return
 
                                 transcript_text = result.get("transcript") or ""
                                 has_error = bool(result.get("error"))
@@ -326,14 +372,16 @@ async def websocket_endpoint(websocket: WebSocket):
 
                                 intent = result.get("intent_report", {}).get("intent")
                                 if intent in ("SUSPICIOUS", "CHEATING"):
+                                    is_cheating = intent == "CHEATING"
                                     alert_payload = {
                                         "type": "alert",
                                         "data": {
                                             "alert_type": "CHEATING_SUSPECTED",
-                                            "message_en": "Suspicious speech detected",
+                                            "message_en": "Cheating speech detected" if is_cheating else "Suspicious speech detected",
                                             "message_si": "",
-                                            "severity": "critical",
+                                            "severity": "critical" if is_cheating else "warning",
                                             "transcript": result.get("transcript"),
+                                            "intent": result.get("intent_report"),
                                             "confidence": result.get("confidence"),
                                             "timestamp": datetime.now().isoformat()
                                         }
