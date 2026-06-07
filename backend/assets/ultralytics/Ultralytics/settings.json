@@ -1,0 +1,21 @@
+{
+  "settings_version": "0.0.6",
+  "datasets_dir": "C:\\Users\\adees\\Desktop\\research\\datasets",
+  "weights_dir": "C:\\Users\\adees\\Desktop\\research\\Next-gen-Learning-System\\weights",
+  "runs_dir": "C:\\Users\\adees\\Desktop\\research\\Next-gen-Learning-System\\runs",
+  "uuid": "8913b0f0afa23efe4bb6be4b0c8b593b7cae3a1303b97381203d5b4cb61fad29",
+  "sync": true,
+  "api_key": "",
+  "openai_api_key": "",
+  "clearml": true,
+  "comet": true,
+  "dvc": true,
+  "hub": true,
+  "mlflow": true,
+  "neptune": true,
+  "raytune": true,
+  "tensorboard": false,
+  "wandb": false,
+  "vscode_msg": true,
+  "openvino_msg": true
+}

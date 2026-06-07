@@ -1,0 +1,21 @@
+timestamp,question_id,topic,question_text,transcript,grade_level,grade_marks,coverage
+2026-06-07T18:17:29,Q76,Systems Analysis,What is 'Phased Implementation'?,Hello.,INCORRECT,0,0.06924956291913986
+2026-06-07T18:17:51,Q197,Data Representation,What is 'Sign and Magnitude' representation?,Magnitude.,INCORRECT,1,0.0
+2026-06-07T18:18:07,Q72,DBMS,What is '2NF' (Second Normal Form)?,6NF.,INCORRECT,0,0.17488880269229412
+2026-06-07T18:18:14,Q231,Systems Analysis,What is 'Maintenance' in SDLC?,SDLC.,INCORRECT,1,0.0
+2026-06-07T18:18:21,Q66,DBMS,What is a 'Composite Key'?,Composite Key.,INCORRECT,1,0.0
+2026-06-07T18:18:29,Q51,Systems Analysis,What is 'Direct Cutover' deployment?,Cut over deployment.,INCORRECT,0,0.1973453832118927
+2026-06-07T18:18:36,Q114,Building Blocks of IS,What is a 'Logic Gate'?,A logic gate is a bed.,PARTIAL,6,0.6453450787862143
+2026-06-07T18:18:46,Q44,DBMS,What is 'SQL' (Structured Query Language)?,SQL is a primary foreign team.,INCORRECT,0,0.22495541788637638
+2026-06-07T18:19:08,Q121,Data Representation,What is 'BCD' (Binary Coded Decimal)?,Binary Coded Decimal.,INCORRECT,1,0.0
+2026-06-07T18:19:18,Q46,DBMS,What is a 'Foreign Key'?,A foreign key.,INCORRECT,1,0.0
+2026-06-07T18:31:42,Q26,Networking,What is the 'OSI Model'?,OSI model,INCORRECT,1,0.0
+2026-06-07T18:31:49,Q241,Programming,What is a 'Function Parameter'?,Parameter.,INCORRECT,1,0.0
+2026-06-07T18:31:58,Q193,Data Representation,What is 'Hexadecimal Number System'?,A decimal number.,INCORRECT,0,0.23299115195870398
+2026-06-07T18:32:05,Q240,Programming,What is 'Type Casting'?,Type Casting.,INCORRECT,1,0.0
+2026-06-07T18:32:27,Q45,DBMS,What is a 'Primary Key'?,What is a primary key? A primary key.,INCORRECT,1,0.0
+2026-06-07T18:32:41,Q170,Operating Systems,What is an 'Interrupt' in OS?,Interrupting OS.,PARTIAL,5,0.5357285737991333
+2026-06-07T18:33:04,Q160,Building Blocks of IS,What is the 'Control Bus'?,The control bus goes to electronic cell phone,INCORRECT,0,0.24657998724417257
+2026-06-07T18:33:21,Q129,Networking,What is 'Throughput'?,Thrrllglg!,INCORRECT,0,0.0
+2026-06-07T18:33:30,Q71,DBMS,What is '1NF' (First Normal Form)?,First Normal Form. Second Normal Form.,INCORRECT,1,0.0
+2026-06-07T18:33:53,Q130,Networking,What is 'Latency' in a network?,Need to protocol it.,INCORRECT,0,0.05229422524571419
