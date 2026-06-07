@@ -19,6 +19,31 @@ function fmt(ms) {
   return `${mm}:${ss}`;
 }
 
+function micErrorMessage(err) {
+  const name = err?.name || "";
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return "Microphone API unavailable. Open this app in Chrome, Edge, or Firefox on localhost or 127.0.0.1.";
+  }
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return "Microphone permission denied. Allow microphone access in the browser site settings and reload.";
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return "No microphone found. Connect a microphone and try again.";
+  }
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return "Microphone is unavailable or busy in another app. Close other apps using it and try again.";
+  }
+  if (name === "SecurityError") {
+    return "Microphone access is blocked on this origin. Open the app on localhost or 127.0.0.1.";
+  }
+  if (name === "OverconstrainedError" || name === "ConstraintNotSatisfiedError") {
+    return "Requested microphone settings are not supported on this device.";
+  }
+
+  return err?.message || "Microphone is not available.";
+}
+
 export default function VoiceQuizPage() {
   const nav = useNavigate();
 
@@ -141,13 +166,22 @@ export default function VoiceQuizPage() {
           Array.isArray(draft.answers) &&
           draft.answers.length === draft.questions.length &&
           typeof draft.remainingMs === "number";
-        
-          // Restore an active draft.
-        if (draftOk && !draft.timeUp) {
+
+        const draftAnsweredCount = draftOk ? draft.answers.filter(Boolean).length : 0;
+        const firstUnansweredIdx = draftOk ? draft.answers.findIndex((answer) => !answer) : -1;
+        const resumeIdx =
+          draftOk && firstUnansweredIdx >= 0
+            ? firstUnansweredIdx
+            : 0;
+
+        // Restore an active draft.
+        if (draftOk && draftAnsweredCount >= draft.questions.length) {
+          clearDraft();
+        } else if (draftOk && !draft.timeUp) {
           setSessionId(draft.sessionId || null);
           setQuestions(draft.questions);
           setAnswers(draft.answers);
-          setIdx(Number.isFinite(draft.idx) ? draft.idx : 0);
+          setIdx(resumeIdx);
           setRemainingMs(draft.remainingMs > 0 ? draft.remainingMs : 0);
           setPaused(!!draft.paused);
           setTimeUp(!!draft.timeUp);
@@ -166,7 +200,7 @@ export default function VoiceQuizPage() {
           setSessionId(draft.sessionId || null);
           setQuestions(draft.questions || []);
           setAnswers(draft.answers || []);
-          setIdx(Number.isFinite(draft.idx) ? draft.idx : 0);
+          setIdx(resumeIdx);
           setRemainingMs(0);
           setPaused(true);
           setTimeUp(true);
@@ -412,8 +446,8 @@ export default function VoiceQuizPage() {
       mr.start();
       mediaRecorderRef.current = mr;
       setRecording(true);
-    } catch {
-      setErr("Microphone permission denied / not available");
+    } catch (e) {
+      setErr(micErrorMessage(e));
     }
   }
 

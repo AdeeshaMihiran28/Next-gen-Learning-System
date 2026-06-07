@@ -81,6 +81,31 @@ function analyzeBrowserTranscript(transcript) {
     };
 }
 
+function micErrorMessage(err) {
+    const name = err?.name || '';
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+        return 'Microphone API unavailable. Open this app in Chrome, Edge, or Firefox on localhost or 127.0.0.1.';
+    }
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        return 'Microphone permission denied. Allow microphone access in the browser site settings and reload.';
+    }
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        return 'No microphone found. Connect a microphone and try again.';
+    }
+    if (name === 'NotReadableError' || name === 'TrackStartError') {
+        return 'Microphone is unavailable or busy in another app. Close other apps using it and try again.';
+    }
+    if (name === 'SecurityError') {
+        return 'Microphone access is blocked on this origin. Open the app on localhost or 127.0.0.1.';
+    }
+    if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') {
+        return 'Requested microphone settings are not supported on this device.';
+    }
+
+    return err?.message || 'Microphone is not available.';
+}
+
 /**
  * AudioCapture
  * - Records short audio chunks (default 5s)
@@ -90,6 +115,7 @@ export default function AudioCapture({ isConnected, sendMessage, pushEvent }) {
     const [isRecording, setIsRecording] = useState(false);
     const [listening, setListening] = useState(false);
     const [lastTranscript, setLastTranscript] = useState('');
+    const [error, setError] = useState('');
     const mediaRecorderRef = useRef(null);
     const streamRef = useRef(null);
     const chunkIntervalRef = useRef(null);
@@ -105,6 +131,7 @@ export default function AudioCapture({ isConnected, sendMessage, pushEvent }) {
 
     const startCapture = async () => {
         try {
+            setError('');
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
 
@@ -234,6 +261,7 @@ export default function AudioCapture({ isConnected, sendMessage, pushEvent }) {
             setListening(true);
         } catch (err) {
             console.error('startCapture error', err);
+            setError(micErrorMessage(err));
             setListening(false);
             stopCapture();
         }
@@ -294,6 +322,12 @@ export default function AudioCapture({ isConnected, sendMessage, pushEvent }) {
             {lastTranscript && (
                 <div className="mt-3 text-sm text-gray-200">
                     <strong>Transcript:</strong> {lastTranscript}
+                </div>
+            )}
+
+            {error && (
+                <div className="mt-3 text-sm text-red-300">
+                    <strong>Audio:</strong> {error}
                 </div>
             )}
         </div>
